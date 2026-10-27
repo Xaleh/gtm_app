@@ -1,0 +1,14 @@
+{
+  "name": "gtm-app",
+  "private": true,
+  "description": "Player de treino de powerlifting alimentado pela planilha semanal do treinador.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "sync": "cp web/parser.js apps-script/Parser.js",
+    "dev": "node scripts/dev-server.mjs",
+    "push:script": "npm run sync && cd apps-script && npx @google/clasp push"
+  },
+  "devDependencies": {
+    "xlsx": "0.18.5"
+  }
+}

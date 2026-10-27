@@ -1,0 +1,19 @@
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Parser do app e do Apps Script são o mesmo arquivo
+        run: diff -q web/parser.js apps-script/Parser.js
+      - run: npm test
