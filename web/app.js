@@ -12,7 +12,7 @@ function save(k, v){ try{ localStorage.setItem(K+k, JSON.stringify(v)); }catch(e
 const S = {
   data: load("data", SAMPLE),
   prs: null,
-  settings: Object.assign({bar:20, collar:0, plates:[25,20,15,10,5,2.5,1.25], api:"", token:"", ntfy:"", ntfyOn:false}, load("settings", {})),
+  settings: Object.assign({bar:20, collar:0, plates:[25,20,15,10,5,2.5,1.25], api:"", token:"", ntfy:"", ntfyOn:false, awake:true}, load("settings", {})),
   queue: load("queue", []),
   sync: {state: "idle", last: load("lastSync", null), error: null},
   log: load("log", []),
@@ -23,6 +23,8 @@ const S = {
   editPR: null,
 };
 S.prs = load("prs", Object.assign({}, S.data.prs));
+// quem já usava os avisos antes desta opção: libera o bloqueio da tela para o aviso chegar ao Watch
+if (S.settings.ntfyOn && !("awake" in load("settings", {}))) { S.settings.awake = false; save("settings", S.settings); }
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -93,7 +95,9 @@ function beep(freq, dur, when){
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+0.05); }catch(e){}
 }
 function buzz(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
-async function keepAwake(){ try{ if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => wake = null); } }catch(e){} }
+// Tela acesa ajuda a ver o timer, mas impede o iPhone de bloquear; sem bloqueio o aviso não vai para o Watch.
+function releaseAwake(){ try{ wake && wake.release(); }catch(e){} wake = null; }
+async function keepAwake(){ if (S.settings.awake === false) return; try{ if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => wake = null); } }catch(e){} }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.view === "play") keepAwake(); });
 
 /* ---------- Execução ---------- */
@@ -448,8 +452,9 @@ function scheduleRestPush(){
 function cancelRestPush(){ if (pushOn()) { ntfyCancel("descanso-10s"); ntfyCancel("descanso"); } }
 async function testPush(){
   if (!pushOn()) { toast("Ative as notificações e confira o tópico"); return; }
-  await fetch(`${NTFY}${encodeURIComponent(S.settings.ntfy)}?t=${encodeURIComponent("GTM")}&p=4`, {method: "POST", body: "Teste: se apareceu no relógio, está tudo certo."}).catch(() => {});
-  toast("Notificação de teste enviada");
+  // O iPhone só repassa ao Watch quando está bloqueado: o teste chega com atraso para dar tempo de bloquear.
+  await ntfyPost("teste", 15, "GTM", "Teste: se apareceu no relógio, está tudo certo.", 5);
+  toast("Bloqueie o iPhone agora. O aviso chega em 15 s.");
 }
 
 /* ---------- Ajustes ---------- */
@@ -463,8 +468,10 @@ function saveConn(){
 }
 function setPush(on){
   if (on && !S.settings.ntfy) S.settings.ntfy = "gtm-" + uid().replace(/-/g, "").slice(0, 16);
+  if (on && !S.settings.ntfyOn) { S.settings.awake = false; releaseAwake(); }
   S.settings.ntfyOn = on; save("settings", S.settings); render();
 }
+function setAwake(on){ S.settings.awake = on; save("settings", S.settings); if (!on) releaseAwake(); render(); }
 function copyTopic(){
   const v = S.settings.ntfy;
   navigator.clipboard && navigator.clipboard.writeText(v).then(() => toast("Tópico copiado"), () => selectTopic());
@@ -489,10 +496,13 @@ function settingsView(){
     ${S.settings.ntfyOn ? `<ol class="steps">
       <li>Instale o app <b>ntfy</b> no iPhone (App Store).</li>
       <li>Toque em <b>+</b> e assine este tópico: <code id="topic">${esc(S.settings.ntfy)}</code> <button class="btn ghost" onclick="copyTopic()">Copiar</button></li>
-      <li>Permita notificações do ntfy e, no app Watch do iPhone, deixe o ntfy espelhar no relógio.</li>
+      <li>Permita notificações do ntfy e, no app Watch do iPhone, em <b>Notificações → ntfy</b>, deixe <b>Espelhar alertas do iPhone</b>.</li>
     </ol>
+    <p class="help">O iPhone só manda o aviso para o relógio quando está bloqueado, com a tela apagada, e com o relógio no pulso e desbloqueado. Um modo Foco ativo também segura o aviso.</p>
+    <div class="field"><label for="awake">Manter a tela acesa no treino</label><input id="awake" type="checkbox" ${S.settings.awake !== false ? "checked" : ""} onchange="setAwake(this.checked)"></div>
+    <p class="help">${S.settings.awake !== false ? "Ligado: o iPhone não bloqueia sozinho, então os avisos ficam só nele. Bloqueie a tela no descanso para receber no relógio." : "Desligado: o iPhone bloqueia sozinho no descanso e o aviso vai para o relógio."}</p>
     <p class="help">O tópico funciona como senha: quem souber o nome vê os avisos. Não compartilhe.</p>
-    <div class="acts"><button class="btn" onclick="testPush()">Enviar teste</button></div>` : ""}
+    <div class="acts"><button class="btn" onclick="testPush()">Testar no relógio (15 s)</button></div>` : ""}
   </section>
   <section class="card"><div class="eyebrow">Barra e anilhas da sua academia</div>
     <div class="field"><label for="bar">Barra</label><select id="bar" onchange="setSetting('bar',+this.value)">${[20,15,25].map(v=>`<option value="${v}" ${S.settings.bar===v?"selected":""}>${v} kg</option>`).join("")}</select></div>

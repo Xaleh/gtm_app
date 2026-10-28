@@ -82,7 +82,11 @@ O Safari não deixa um site mandar notificação agendada sozinho, então o app 
 1. Instale o app **ntfy** no iPhone.
 2. No GTM, em **Ajustes**, ligue **Avisar fim do descanso**. O app cria um tópico aleatório.
 3. No ntfy, toque em **+** e assine esse tópico.
-4. Toque em **Enviar teste**. Com o iPhone bloqueado, a notificação aparece e vibra no relógio, se o espelhamento de notificações do ntfy estiver ligado no app Watch.
+4. Toque em **Testar no relógio (15 s)** e bloqueie o iPhone. O aviso chega 15 s depois e vibra no relógio.
+
+O iPhone só repassa notificações ao Watch quando ele próprio está bloqueado, com a tela apagada, e o relógio está no pulso e desbloqueado. Um modo Foco ativo também segura o aviso. Com o iPhone na mão e desbloqueado, a notificação fica só nele.
+
+Por isso, ao ligar os avisos, o app desliga a opção **Manter a tela acesa no treino**: o iPhone bloqueia sozinho durante o descanso e o aviso vai para o relógio. Um bloqueio automático curto (Ajustes do iPhone → Tela e Brilho → Bloqueio Automático → 30 segundos) faz isso acontecer bem antes do fim do descanso. No app Watch do iPhone, confira em **Notificações → ntfy** se **Espelhar alertas do iPhone** está ligado.
 
 Como funciona: ao concluir uma série, o app agenda duas mensagens no ntfy, uma a 10 s do fim do descanso e outra no fim, com a próxima carga e as anilhas por lado. Se você começa a série antes, ou volta, as mensagens são canceladas. Se o descanso ganha +30 s, elas são reagendadas. O ntfy aceita atraso mínimo de 10 s, então descansos de até 20 s não recebem o aviso de 10 s.
 
