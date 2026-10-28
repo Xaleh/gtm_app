@@ -243,7 +243,7 @@ function confirmHTML(){
   const ex = sessById(S.run.sid).exercises[c.ei];
   const head = `<div><div class="eyebrow">Fim do exercício</div><h3>${esc(ex.name)} · ${ex.sets}×${esc(repsLabel(ex.reps))}</h3></div>`;
   if (c.stage === "ask") return `<div class="confirm px hot">${head}
-    <div>Fez com a carga da planilha, <b class="num" style="font-size:22px">${fmt(c.planned)} kg</b>?</div>
+    <div>Fez com a carga da planilha, <b class="num" style="font-size:28px">${fmt(c.planned)} kg</b>?</div>
     <div class="acts"><button class="btn primary" onclick="confirmYes()">Sim, ${fmt(c.planned)} kg</button><button class="btn" onclick="confirmEdit()">Usei outra carga</button></div></div>`;
   if (c.stage === "edit") return `<div class="confirm px hot">${head}
     <div>${c.planned==null ? "Qual carga você usou?" : "Qual carga você usou de fato?"}</div>
@@ -280,7 +280,7 @@ function playView(){
 
   if (r.phase === "done") {
     const rows = r.results.map(e => `<div><span>${esc(e.ex)}<br><span class="muted" style="font-size:12px">${e.sets}×${esc(repsLabel(e.reps))}</span></span><span class="num" style="font-size:20px">${fmt(e.actual)} kg</span></div>`).join("");
-    return `${hud}${confirmHTML()}${videoCard(r.videoId)}<div class="stage px"><div class="cap"><span class="tagcur">${esc(sess.name)}</span><div class="exname" style="font-size:40px">Treino concluído</div><div class="underline"></div>
+    return `${hud}${confirmHTML()}${videoCard(r.videoId)}<div class="stage px"><div class="cap"><span class="tagcur">${esc(sess.name)}</span><div class="exname" style="font-size:48px">Treino concluído</div><div class="underline"></div>
       <div class="setline"><span class="chip">${ICON_CLOCK}${clock(Date.now() - (r.started || Date.now()))}</span><span class="chip">${total} séries</span></div></div></div>
       ${rows ? `<div class="summary px">${rows}</div>` : ""}
       <button class="big" onclick="closeRun()">Voltar para a semana</button>`;
