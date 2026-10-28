@@ -438,32 +438,62 @@ function sheetIdFrom(s){
   const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || s.match(/^([a-zA-Z0-9_-]{30,})$/);
   return m ? m[1] : null;
 }
-async function sheetsGet(path, params){
-  const u = new URL(SHEETS + encodeURIComponent(S.settings.sheetId) + path);
+// Dois tipos de arquivo podem vir no link:
+//  - planilha nativa do Google: lida pela API do Sheets (valores + fórmulas da primeira aba);
+//  - arquivo Excel (.xlsx) guardado no Drive: a API do Sheets não lê; baixa pelo Drive e lê com o mesmo leitor da importação.
+const DRIVE = "https://www.googleapis.com/drive/v3/files/";
+async function googleGet(url, params, as){
+  const u = new URL(url);
   Object.entries(Object.assign({key: apiKey()}, params || {})).forEach(([k, v]) => u.searchParams.set(k, v));
   let res;
   try { res = await fetch(u, {cache: "no-store"}); } catch (e) { throw new Error("Sem internet agora. Os treinos da última leitura continuam aqui."); }
-  if (res.ok) return res.json();
+  if (res.ok) return as === "buffer" ? res.arrayBuffer() : res.json();
   let msg = ""; try { msg = ((await res.json()).error || {}).message || ""; } catch (e) {}
   const detail = msg ? ` (Google: ${msg})` : ` (Google: erro ${res.status})`;
-  if (/not supported for this document/i.test(msg)) throw new Error("Esse link é de um arquivo Excel (.xlsx) guardado no Drive, que o Google não deixa ler por link. Peça ao treinador para abrir o arquivo e usar Arquivo → Salvar como Planilhas Google, e passar a editar essa versão. Ou use Importar planilha (.xlsx).");
-  if (/referer|api key|api_key|has not been used|disabled|billing/i.test(msg)) throw new Error("O Google recusou a chave do app. Avise quem mantém o GTM." + detail);
+  if (/not supported for this document/i.test(msg)) { const e = new Error("office"); e.office = true; throw e; }
+  if (/drive api/i.test(msg) && /has not been used|disabled/i.test(msg)) throw new Error("Falta ativar a Google Drive API no projeto da chave do app. Avise quem mantém o GTM." + detail);
+  if (/referer|api key|api_key|has not been used|disabled|billing|blocked/i.test(msg)) throw new Error("O Google recusou a chave do app. Avise quem mantém o GTM." + detail);
   if (res.status === 403 || res.status === 401) throw new Error("A planilha não está aberta por link. Peça ao treinador: Compartilhar → Qualquer pessoa com o link → Leitor.");
-  if (res.status === 404) throw new Error("Não achei essa planilha. Confira o link que o treinador mandou.");
+  // o Drive responde 404 tanto para link errado quanto para arquivo não compartilhado
+  if (res.status === 404) throw new Error("Não achei essa planilha. Confira o link e se ela está compartilhada como Qualquer pessoa com o link → Leitor.");
   if (res.status === 429) throw new Error("Muitas leituras seguidas. Tente de novo em um minuto.");
   throw new Error("Não consegui ler a planilha. Tente de novo; se continuar, mande esta mensagem para quem mantém o GTM." + detail);
 }
-async function fetchLinkedWeek(){
+const sheetsGet = (path, params) => googleGet(SHEETS + encodeURIComponent(S.settings.sheetId) + path, params);
+
+async function fetchNativeWeek(){
   const meta = await sheetsGet("", {fields: "properties.title,sheets.properties(title,index,hidden)"});
   const first = (meta.sheets || []).map(s => s.properties).filter(p => !p.hidden).sort((a, b) => a.index - b.index)[0];
   if (!first) throw new Error("A planilha está vazia.");
   // a aba inteira: pedir um intervalo maior que a aba (ex.: A1:Z300 numa aba de 21 colunas) faz o Google recusar
   const range = "/values/" + encodeURIComponent(`'${first.title.replace(/'/g, "''")}'`);
   const [v, f] = await Promise.all([sheetsGet(range, {valueRenderOption: "UNFORMATTED_VALUE"}), sheetsGet(range, {valueRenderOption: "FORMULA"})]);
-  const data = TreinoParser.parseSheet(TreinoParser.fromApi(v.values, f.values), first.title);
-  if (!data.sessions.length) throw new Error(`Não achei treinos na primeira aba ("${first.title}"). A semana atual precisa ser a primeira aba.`);
-  S.settings.sheetTitle = (meta.properties || {}).title || ""; save("settings", S.settings);
-  return data;
+  return {data: TreinoParser.parseSheet(TreinoParser.fromApi(v.values, f.values), first.title), title: (meta.properties || {}).title || ""};
+}
+async function fetchExcelWeek(force){
+  const id = encodeURIComponent(S.settings.sheetId);
+  const meta = await googleGet(DRIVE + id, {fields: "name,modifiedTime,md5Checksum,size", supportsAllDrives: "true"});
+  const rev = meta.md5Checksum || meta.modifiedTime || "";
+  // o arquivo inteiro tem todas as semanas; só baixa de novo quando ele muda
+  if (!force && rev && S.settings.sheetRev === rev && !isSample()) return {data: null, title: meta.name || ""};
+  await loadSheetJS().catch(() => { throw new Error("Sem internet agora. Os treinos da última leitura continuam aqui."); });
+  const buf = await googleGet(DRIVE + id, {alt: "media", supportsAllDrives: "true"}, "buffer");
+  let wb;
+  try { wb = XLSX.read(buf, {cellFormula: true}); } catch (e) { throw new Error("O arquivo do link não é uma planilha que o app consiga ler. Confira o link."); }
+  const name = wb.SheetNames[0];
+  S.settings.sheetRev = rev;
+  return {data: TreinoParser.parseSheet(wb.Sheets[name], name), title: (meta.name || "").replace(/\.xlsx?$/i, "")};
+}
+async function fetchLinkedWeek(force){
+  let r;
+  if (S.settings.sheetKind === "excel") r = await fetchExcelWeek(force);
+  else {
+    try { r = await fetchNativeWeek(); S.settings.sheetKind = "google"; }
+    catch (e) { if (!e.office) throw e; S.settings.sheetKind = "excel"; r = await fetchExcelWeek(true); }
+  }
+  if (r.data && !r.data.sessions.length) throw new Error(`Não achei treinos na primeira aba ("${r.data.sheet}"). A semana atual precisa ser a primeira aba.`);
+  S.settings.sheetTitle = r.title; save("settings", S.settings);
+  return r.data;
 }
 let linkBusy = null;
 function linkSync(force){
@@ -473,11 +503,11 @@ function linkSync(force){
   S.sync.state = "busy"; refreshSync();
   linkBusy = (async () => {
     try {
-      const data = await fetchLinkedWeek();
-      const changed = JSON.stringify(data) !== JSON.stringify(S.data);
+      const data = await fetchLinkedWeek(force);
+      const changed = !!data && JSON.stringify(data) !== JSON.stringify(S.data);
       const kept = changed ? applyWeek(data, "planilha do treinador") : [];
       S.sync.state = "ok"; S.sync.error = null; S.sync.last = Date.now(); save("lastSync", S.sync.last);
-      return {changed, kept, week: data.week};
+      return {changed, kept, week: (data || S.data).week};
     } catch (e) { S.sync.state = "error"; S.sync.error = e.message || String(e); throw e; }
     finally { linkBusy = null; if (S.view !== "play") render(); else refreshSync(); }
   })();
@@ -491,7 +521,8 @@ async function connectLink(inputId){
   linkForm.value = raw;
   if (!id) { linkForm.error = "Isso não parece um link de planilha do Google. Copie o link inteiro, que começa com docs.google.com/spreadsheets."; render(); return; }
   const prev = {id: S.settings.sheetId, title: S.settings.sheetTitle};
-  S.settings.sheetId = id; S.settings.sheetTitle = "";
+  const prevKind = S.settings.sheetKind, prevRev = S.settings.sheetRev;
+  S.settings.sheetId = id; S.settings.sheetTitle = ""; S.settings.sheetKind = ""; S.settings.sheetRev = "";
   linkForm.busy = true; linkForm.error = ""; render();
   try {
     const r = await linkSync(true);
@@ -499,7 +530,7 @@ async function connectLink(inputId){
     S.view = "home"; render(); window.scrollTo(0, 0);
     toast("Conectado. Semana: " + r.week + (r.kept.length ? ` · mantive seu PR ajustado de ${r.kept.join(", ")}` : ""));
   } catch (e) {
-    S.settings.sheetId = prev.id; S.settings.sheetTitle = prev.title; save("settings", S.settings);
+    S.settings.sheetId = prev.id; S.settings.sheetTitle = prev.title; S.settings.sheetKind = prevKind; S.settings.sheetRev = prevRev; save("settings", S.settings);
     S.sync.state = "idle"; S.sync.error = null;
     linkForm.busy = false; linkForm.error = e.message || String(e); render();
   }
@@ -510,7 +541,7 @@ async function refreshLink(){
 }
 function disconnectLink(){
   if (!S.settings.unlinkAsk) { S.settings.unlinkAsk = true; render(); return; }
-  delete S.settings.unlinkAsk; S.settings.sheetId = ""; S.settings.sheetTitle = ""; save("settings", S.settings);
+  delete S.settings.unlinkAsk; S.settings.sheetId = ""; S.settings.sheetTitle = ""; S.settings.sheetKind = ""; S.settings.sheetRev = ""; save("settings", S.settings);
   S.sync.state = "idle"; S.sync.error = null; render(); toast("Planilha desconectada. Os treinos atuais continuam aqui.");
 }
 async function pasteInto(inputId){

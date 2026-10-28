@@ -95,7 +95,9 @@ O tópico funciona como senha: quem souber o nome consegue ler e mandar mensagen
 
 ## Planilha por link (sem Apps Script) — o jeito mais simples
 
-Para quem não quer mexer com Apps Script: o treinador compartilha a planilha como **Qualquer pessoa com o link → Leitor**, manda o link, e o atleta cola no app (primeira tela ou **Ajustes → Planilha do treinador**). O app lê a planilha pela API do Google Sheets toda vez que abre e troca de semana quando aparece uma aba nova na frente. Durante um treino a semana não muda; a troca entra quando o treino termina.
+Para quem não quer mexer com Apps Script: o treinador compartilha a planilha como **Qualquer pessoa com o link → Leitor**, manda o link, e o atleta cola no app (primeira tela ou **Ajustes → Planilha do treinador**). O app lê a planilha toda vez que abre e troca de semana quando aparece uma aba nova na frente.
+
+Funciona com os dois tipos de arquivo do Drive: planilha nativa do Google (lida pela API do Sheets) e arquivo Excel (.xlsx) guardado no Drive e aberto no Planilhas Google (o link tem `rtpof=true`). O Excel é baixado pela API do Drive e lido com o mesmo leitor da importação, e só é baixado de novo quando muda. Durante um treino a semana não muda; a troca entra quando o treino termina.
 
 Quem tiver o link consegue ver a planilha. O link é longo e não dá para adivinhar, mas não deve circular em grupos.
 
@@ -104,17 +106,17 @@ Histórico, PRs e vídeos ficam no celular. Em **Ajustes → Seu histórico** (o
 ### Criar a chave da API (uma vez, por quem mantém o app)
 
 1. Em [console.cloud.google.com](https://console.cloud.google.com), crie um projeto (ex.: `gtm-app`).
-2. Em **APIs e serviços → Biblioteca**, ative a **Google Sheets API**.
+2. Em **APIs e serviços → Biblioteca**, ative a **Google Sheets API** e a **Google Drive API**. A do Drive é para quando o link é de um arquivo Excel (.xlsx) guardado no Drive, que a API de planilhas não lê.
 3. Em **APIs e serviços → Credenciais → Criar credenciais → Chave de API**.
 4. Edite a chave e restrinja:
    - **Restrições de aplicativo → Sites**: `https://xaleh.github.io/*`
-   - **Restrições de API → Restringir chave**: só **Google Sheets API**
+   - **Restrições de API → Restringir chave**: só **Google Sheets API** e **Google Drive API**
 5. No GitHub: **Settings → Secrets and variables → Actions → Variables → New repository variable**, nome `SHEETS_API_KEY`, valor = a chave.
 6. Em **Actions → Publicar no GitHub Pages → Run workflow**, para publicar com a chave.
 
 A chave fica visível no código do site, como em qualquer app web que usa APIs do Google; as restrições acima impedem o uso fora do GTM e fora da API de planilhas. Ela não dá acesso a nada privado: só lê planilhas abertas por link. Sem a variável, o app esconde a opção de link e segue com .xlsx e Apps Script.
 
-A cota gratuita da API (300 leituras por minuto por projeto) atende com folga: cada abertura do app faz 3 leituras.
+A cota gratuita da API (300 leituras por minuto por projeto) atende com folga: cada abertura do app faz até 3 leituras.
 
 ## Usar só com o .xlsx (sem Apps Script)
 
