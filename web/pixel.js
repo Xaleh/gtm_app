@@ -6,9 +6,9 @@
 
   // ---------- paleta ----------
   const HEX = {
-    ol: "#14161f", skin: "#f0b98d", skinS: "#c98a62", hair: "#3a2618", sing: "#3b6cf0", singS: "#2648b8",
+    ol: "#14161f", skin: "#f0b98d", skinS: "#c98a62", hair: "#3a2618", sing: "#ff6b1a", singS: "#b8440a",
     shorts: "#2a2d36", shortsS: "#1c1e25", shoe: "#e9ecef", belt: "#8a4b26", metal: "#9aa3b0", metalD: "#5d6573",
-    pad: "#3d4357", padL: "#565e78", wood: "#b07a45", woodD: "#7e5530", wall: "#1b2030", wallL: "#232a3d", rubber: "#2b2f38",
+    pad: "#3a3a48", padL: "#55556a", wood: "#b07a45", woodD: "#7e5530", wall: "#14141b", wallL: "#1d1d27", rubber: "#2b2f38",
     rubberL: "#353a45", cable: "#c9ced6", stick: "#d9a35b", hi: "#ffffff",
     p25: "#d62828", p20: "#1f4fd8", p15: "#e6b800", p10: "#178a45", p5: "#eef0f2", p2: "#2a2e36", p1: "#b9bec6",
   };

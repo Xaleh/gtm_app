@@ -75,7 +75,7 @@ function plates(kg){
 function plateHTML(kg, compact){
   const P = plates(kg);
   if (!P) return "";
-  const rig = P.list.map(p => `<span class="plate" style="height:${p.h*(compact?.7:.86)}px;width:${p.w}px;background:var(${p.c})" title="${fmt(p.kg)} kg"></span>`).join("");
+  const rig = P.list.map(p => `<span class="plate" style="height:${Math.round(p.h*(compact?.7:.86)/4)*4}px;width:${Math.round(p.w/2)*2}px;background:var(${p.c})" title="${fmt(p.kg)} kg"></span>`).join("");
   const counts = {}; P.list.forEach(p => counts[p.kg] = (counts[p.kg]||0)+1);
   const txt = P.under ? "Abaixo do peso da barra" :
     P.list.length ? Object.entries(counts).sort((a,b)=>b[0]-a[0]).map(([k,c]) => `${c>1?c+"× ":""}<b>${fmt(+k)}</b>`).join(" + ") + " <span class='muted'>por lado</span>" : "Só a barra";
@@ -105,7 +105,7 @@ function startRun(id){
   audioOn(); keepAwake();
   const sess = sessById(id);
   if (!S.run || S.run.sid !== id || S.run.sheet !== S.data.sheet)
-    S.run = {sid:id, sheet:S.data.sheet, steps: buildSteps(sess), i:0, phase:"work", confirm:null, results:[], override:{}};
+    S.run = {sid:id, sheet:S.data.sheet, steps: buildSteps(sess), i:0, phase:"work", confirm:null, results:[], override:{}, started: Date.now()};
   S.view = "play"; persistRun(); render();
 }
 function persistRun(){ save("run", S.run); }
@@ -171,11 +171,12 @@ function prKeep(){ S.run.override[S.run.confirm.ei] = S.run.confirm.actual; S.ru
 /* ---------- Timer ---------- */
 function tick(){
   if (S.view !== "play" || !S.run) return;
+  const el0 = document.getElementById("elapsed"); if (el0 && S.run.started) el0.textContent = clock(Date.now() - S.run.started);
   if (S.run.phase === "rest" && S.run.restEnd) {
     const left = (S.run.restEnd - Date.now())/1000;
-    const t = document.getElementById("rt"), ring = document.getElementById("ring"), arc = document.getElementById("arc"), lab = document.getElementById("rl");
+    const t = document.getElementById("rt"), ring = document.getElementById("ring"), lab = document.getElementById("rl");
     if (t) t.textContent = left > 0 ? mmss(left) : "+" + mmss(-left);
-    if (arc) arc.style.strokeDashoffset = String((1 - Math.max(0, Math.min(1, left / S.run.restTotal))) * 100);
+    if (ring) { const rs = ring.querySelectorAll("rect"), on = Math.ceil(Math.max(0, Math.min(1, left / S.run.restTotal)) * rs.length); rs.forEach((el, k) => el.classList.toggle("on", k < on)); }
     if (ring) ring.className = "ring" + (left <= 0 ? " go" : left <= 10 ? " warn" : "");
     if (lab) lab.textContent = left > 0 ? "descanso" : "bora, barra!";
     if (left <= 10 && left > 0 && !S.run.a10) { S.run.a10 = true; beep(660,.12); beep(660,.12,.2); buzz([150,100,150]); }
@@ -190,22 +191,30 @@ function tick(){
 setInterval(tick, 250);
 
 /* ---------- Telas ---------- */
-const ICON_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>`;
-const ICON_X = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICON_PLAY = `<svg viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M4 2h2v1h2v1h2v1h2v1h2v4h-2v1h-2v1H8v1H6v1H4z"/></svg>`;
+const PX = 'shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"';
+const ICON_GEAR = `<svg viewBox="0 0 16 16" ${PX}><path d="M7 1h2v2h2v1h1v1h1v2h2v2h-2v2h-1v1h-1v1H9v2H7v-2H5v-1H4v-1H3V9H1V7h2V5h1V4h1V3h2zM7 6v1H6v2h1v1h2V9h1V7H9V6z"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 16 16" ${PX}><path d="M13 3h2v2h-1v1h-1v1h-1v1h-1v1h-1v1H9v1H8v1H7v1H5v-1H4v-1H3V9H2V8H1V6h2v1h1v1h1v1h1v1h1V9h1V8h1V7h1V6h1V5h1V4h1z"/></svg>`;
+const ICON_BACK = `<svg viewBox="0 0 16 16" ${PX}><path d="M7 2h2v2H8v1H7v1h7v4H7v1h1v1h1v2H7v-1H6v-1H5v-1H4V9H3V7h1V6h1V5h1V4h1z"/></svg>`;
+const ICON_CLOCK = `<svg viewBox="0 0 10 10" ${PX}><path d="M3 0h4v1h1v1h1v1h1v4H9v1H8v1H7v1H3V9H2V8H1V7H0V3h1V2h1V1h1zM4 2v4h3V5H5V2z"/></svg>`;
+const LOGO = `<svg viewBox="0 0 15 10" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="4" width="15" height="2" fill="#A9B0BC"/><rect x="2" y="1" width="2" height="8" fill="#FF6B1A"/><rect x="4" y="2" width="1" height="6" fill="#B8440A"/><rect x="11" y="1" width="2" height="8" fill="#FF6B1A"/><rect x="10" y="2" width="1" height="6" fill="#B8440A"/></svg>`;
+const ICON_X = `<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M2 2h3v1h1v1h1v1h2V4h1V3h1V2h3v3h-1v1h-1v1h-1v2h1v1h1v1h1v3h-3v-1h-1v-1H9v-1H7v1H6v1H5v1H2v-3h1v-1h1V9h1V7H4V6H3V5H2z"/></svg>`;
 
 function sessDoneThisWeek(s){ return S.log.some(l => l.sheet === S.data.sheet && l.session === s.name); }
 function estMinutes(s){ return Math.round(s.exercises.reduce((t, e) => t + e.sets * (40 + (e.rest || 60)), 0) / 60); }
 
+// "SEMANA 20" → número em laranja, como o destaque da referência
+const weekTitle = w => esc(w).replace(/(\d+)\s*$/, "<em>$1</em>");
 function homeView(){
   const d = S.data, total = (S.prs.S||0) + (S.prs.B||0) + (S.prs.D||0);
   const prTiles = ["S","B","D"].map(l => S.editPR === l
-    ? `<div class="pr"><span class="lift">${SHORT[l]}</span><input id="pr-${l}" type="number" inputmode="decimal" step="2.5" value="${S.prs[l]}" aria-label="PR de ${LIFTS[l]}" onkeydown="if(event.key==='Enter')savePR('${l}')" onblur="savePR('${l}')"></div>`
-    : `<button class="pr" onclick="editPR('${l}')" aria-label="Editar PR de ${LIFTS[l]}"><span class="lift">${SHORT[l]}</span><span class="v num">${fmt(S.prs[l])}<small>kg</small></span></button>`).join("");
+    ? `<div class="pr px hot"><span class="lift">${SHORT[l]}</span><input id="pr-${l}" type="number" inputmode="decimal" step="2.5" value="${S.prs[l]}" aria-label="PR de ${LIFTS[l]}" onkeydown="if(event.key==='Enter')savePR('${l}')" onblur="savePR('${l}')"></div>`
+    : `<button class="pr px" onclick="editPR('${l}')" aria-label="Editar PR de ${LIFTS[l]}"><span class="lift">${SHORT[l]}</span><span class="v num">${fmt(S.prs[l])}<small>kg</small></span></button>`).join("");
   const sess = d.sessions.map(s => {
     const tops = s.exercises.filter(e => e.kind === "top").map(e => `<span>${esc(LIFTS[e.lift]||e.name)} ${e.sets}×${repsLabel(e.reps)} <b>${fmt(planned(s, s.exercises.indexOf(e)).kg)}</b></span>`).join("");
     const nSets = s.exercises.reduce((t,e)=>t+e.sets,0);
-    return `<div class="sess"><div style="min-width:0">
-      <h2>${esc(s.name)} ${s.focus ? `<span>${esc(s.focus)}</span>` : ""} ${sessDoneThisWeek(s) ? `<span class="done-chip">FEITO</span>` : ""}</h2>
+    return `<div class="sess px${sessDoneThisWeek(s) ? " ok" : ""}"><div style="min-width:0">
+      <h2>${esc(s.name)} ${s.focus ? `<span class="focus">${esc(s.focus)}</span>` : ""} ${sessDoneThisWeek(s) ? `<span class="done-chip">FEITO</span>` : ""}</h2>
       ${tops ? `<div class="tops">${tops}</div>` : ""}
       <div class="meta">${s.exercises.length} exercícios · ${nSets} séries · ~${estMinutes(s)} min</div></div>
       <button class="play" onclick="startRun(${s.id})" aria-label="Iniciar ${esc(s.name)}">${ICON_PLAY}</button></div>`;
@@ -216,16 +225,16 @@ function homeView(){
     ...S.log.slice(0,6).map(l => ({ts:l.ts, html:`<span>${esc(l.ex)}<br><span class="d">${esc(l.session)} · ${l.sets}×${esc(repsLabel(l.reps))}</span></span><span class="num" style="font-size:18px">${l.planned!=null && Math.abs(l.actual-l.planned)>.01 ? `<span class="${l.actual>l.planned?'up':'down'}">${fmt(l.actual)}</span>` : fmt(l.actual)} kg</span>`}))]
     .sort((a,b)=>b.ts-a.ts).slice(0,7);
   return `
-  <header class="top"><div><div class="eyebrow">${esc(d.athlete || "Atleta")} · powerlifting</div><h1>${esc(d.week)}</h1>
-    <div class="src">Planilha: aba “${esc(d.sheet)}”</div></div>
-    <button class="btn" onclick="openSettings()">Ajustes</button></header>
-  ${syncLine()}
+  <header class="top"><div class="logo">${LOGO}GTM</div>
+    <button class="btn iconbtn" onclick="openSettings()" aria-label="Ajustes">${ICON_GEAR}</button></header>
+  <div class="week"><div class="eyebrow">${esc(d.athlete || "Atleta")} · powerlifting</div><h1>${weekTitle(d.week)}</h1>
+    <div class="src">Planilha: aba “${esc(d.sheet)}”</div>${syncLine()}</div>
   <section><div class="eyebrow">PRs · total ${fmt(total)} kg</div><div class="prs">${prTiles}</div>
     <div class="prnote" style="margin-top:6px"><span>Toque para editar. As cargas de top set recalculam na hora.</span></div></section>
   ${resume}
   ${pendingVideos()}
   <section><div class="eyebrow">Treinos da semana</div><div class="sessions">${sess}</div></section>
-  ${hist.length ? `<section><div class="eyebrow">Últimos registros</div><div class="hist">${hist.map(h=>`<div>${h.html}</div>`).join("")}</div></section>` : ""}
+  ${hist.length ? `<section><div class="eyebrow">Últimos registros</div><div class="hist px">${hist.map(h=>`<div>${h.html}</div>`).join("")}</div></section>` : ""}
   `;
 }
 
@@ -233,14 +242,14 @@ function confirmHTML(){
   const c = S.run && S.run.confirm; if (!c) return "";
   const ex = sessById(S.run.sid).exercises[c.ei];
   const head = `<div><div class="eyebrow">Fim do exercício</div><h3>${esc(ex.name)} · ${ex.sets}×${esc(repsLabel(ex.reps))}</h3></div>`;
-  if (c.stage === "ask") return `<div class="confirm">${head}
+  if (c.stage === "ask") return `<div class="confirm px hot">${head}
     <div>Fez com a carga da planilha, <b class="num" style="font-size:22px">${fmt(c.planned)} kg</b>?</div>
     <div class="acts"><button class="btn primary" onclick="confirmYes()">Sim, ${fmt(c.planned)} kg</button><button class="btn" onclick="confirmEdit()">Usei outra carga</button></div></div>`;
-  if (c.stage === "edit") return `<div class="confirm">${head}
+  if (c.stage === "edit") return `<div class="confirm px hot">${head}
     <div>${c.planned==null ? "Qual carga você usou?" : "Qual carga você usou de fato?"}</div>
     <div class="stepper"><button onclick="confirmStep(-2.5)" aria-label="Menos 2,5 kg">−</button><input id="actual" type="number" inputmode="decimal" step="0.5" value="${c.actual ?? ""}" aria-label="Carga usada em kg"><button onclick="confirmStep(2.5)" aria-label="Mais 2,5 kg">+</button><span class="muted">kg</span></div>
     <div class="acts"><button class="btn primary" onclick="confirmSave()">Salvar</button><button class="btn ghost" onclick="confirmSkip()">Pular</button></div></div>`;
-  if (c.stage === "pr") return `<div class="confirm">${head}
+  if (c.stage === "pr") return `<div class="confirm px hot">${head}
     <div>${fmt(c.actual)} kg em ${Math.round(c.pct*100)}% indica um PR de ${LIFTS[c.lift].toLowerCase()} de <b class="num ${c.implied>S.prs[c.lift]?'up':'down'}" style="font-size:22px">${fmt(c.implied)} kg</b> (hoje: ${fmt(S.prs[c.lift])} kg).</div>
     <div class="acts"><button class="btn primary" onclick="prAccept()">Atualizar PR para ${fmt(c.implied)}</button><button class="btn" onclick="prKeep()">Manter ${fmt(S.prs[c.lift])}</button></div></div>`;
   return "";
@@ -251,14 +260,29 @@ function demoURL(name){
   return "https://www.youtube.com/results?search_query=" + encodeURIComponent(base + " técnica powerlifting");
 }
 
+// anel feito de quadradinhos (timer de descanso e contador de reps)
+function ringSVG(n, size){
+  let s = "";
+  for (let k = 0; k < n; k++) {
+    const a = k / n * Math.PI * 2, x = 50 + Math.sin(a) * 44, y = 50 - Math.cos(a) * 44;
+    s += `<rect x="${(x - size/2).toFixed(1)}" y="${(y - size/2).toFixed(1)}" width="${size}" height="${size}" transform="rotate(${(k/n*360).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})" class="on"/>`;
+  }
+  return `<svg viewBox="0 0 100 100" shape-rendering="crispEdges" aria-hidden="true">${s}</svg>`;
+}
+const clock = ms => { const s = Math.max(0, Math.floor(ms/1000)), h = Math.floor(s/3600), m = Math.floor(s%3600/60); return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(s%60).padStart(2,"0"); };
+
 function playView(){
   const r = S.run, sess = sessById(r.sid), total = r.steps.length, pct = Math.round(Math.min(r.i, total) / total * 100);
-  const bar = `<div class="pbar"><button class="x" onclick="goHome()" aria-label="Sair do treino">${ICON_X}</button><div class="prog"><i style="width:${pct}%"></i></div><span class="pcount">${Math.min(r.i+(r.phase==="work"?1:0), total)}/${total}</span></div>`;
+  const hud = `<div class="hud"><button class="btn iconbtn" onclick="goHome()" aria-label="Sair do treino">${ICON_X}</button>
+    <span class="chip" title="Tempo de treino">${ICON_CLOCK}<span id="elapsed">${clock(Date.now() - (r.started || Date.now()))}</span></span><span class="grow"></span>
+    <span class="chip hot">${Math.min(r.i+(r.phase==="work"?1:0), total)}/${total}</span></div>
+    <div class="prog" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>`;
 
   if (r.phase === "done") {
     const rows = r.results.map(e => `<div><span>${esc(e.ex)}<br><span class="muted" style="font-size:12px">${e.sets}×${esc(repsLabel(e.reps))}</span></span><span class="num" style="font-size:20px">${fmt(e.actual)} kg</span></div>`).join("");
-    return `${bar}${confirmHTML()}${videoCard(r.videoId)}<div><div class="eyebrow">${esc(sess.name)}</div><div class="exname" style="font-size:44px">Treino concluído</div></div>
-      ${rows ? `<div class="summary">${rows}</div>` : ""}
+    return `${hud}${confirmHTML()}${videoCard(r.videoId)}<div class="stage px"><div class="cap"><span class="tagcur">${esc(sess.name)}</span><div class="exname" style="font-size:40px">Treino concluído</div><div class="underline"></div>
+      <div class="setline"><span class="chip">${ICON_CLOCK}${clock(Date.now() - (r.started || Date.now()))}</span><span class="chip">${total} séries</span></div></div></div>
+      ${rows ? `<div class="summary px">${rows}</div>` : ""}
       <button class="big" onclick="closeRun()">Voltar para a semana</button>`;
   }
 
@@ -271,17 +295,17 @@ function playView(){
       delta = Math.abs(d) < .01 ? `<span class="delta muted">Mesma carga</span>` : `<span class="delta ${d>0?'up':'down'}">${d>0?"+":"−"}${fmt(Math.abs(d))} kg por lado</span>`;
     }
     const exChange = !prev || prev.ei !== nst.ei;
-    return `${bar}<div class="rest">
-      <div class="ring" id="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="none" stroke="var(--sunken)" stroke-width="7"/><circle id="arc" class="fg" cx="50" cy="50" r="46" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/></svg>
+    return `${hud}<div class="rest">
+      <div class="ring" id="ring">${ringSVG(36, 7)}
         <div class="t"><div><span class="num" id="rt">${mmss(r.restTotal)}</span><small id="rl">descanso</small></div></div></div>
       <div class="restbtns"><button class="btn" onclick="addRest(30)">+30 s</button><button class="btn primary" onclick="endRest()">Começar série</button></div>
-      <div class="muted" style="font-size:12px">Pausa da planilha: ${restLabel(sess.exercises[prev.ei])}</div>
+      <div class="eyebrow">Pausa da planilha: ${restLabel(sess.exercises[prev.ei])}</div>
     </div>
     ${confirmHTML()}
     ${videoCard(r.videoId)}
-    <div class="next"><div class="eyebrow">${exChange ? "Próximo exercício · monte a barra" : "Próxima série"}</div>
+    <div class="next px"><div class="eyebrow" style="color:var(--accent)">${exChange ? "Próximo exercício · monte a barra" : "Próxima série"}</div>
       <div class="row"><div style="min-width:0"><div style="font-weight:600">${esc(nex.name)}</div><div class="muted" style="font-size:13px">Série ${nst.set} de ${nex.sets} · ${esc(repsLabel(nex.reps))} reps</div></div>
-      ${np.kg != null ? `<div style="text-align:right"><span class="kg num">${fmt(np.kg)}</span><span class="muted"> kg</span></div>` : ""}</div>
+      ${np.kg != null ? `<div style="text-align:right;white-space:nowrap"><span class="kg">${fmt(np.kg)}</span><span class="muted"> kg</span></div>` : ""}</div>
       ${delta}${np.kg != null && nex.kind !== "accessory" ? plateHTML(np.kg, true) : ""}</div>`;
   }
 
@@ -291,23 +315,28 @@ function playView(){
   const spec = PixelMoves.specFor(ex);
   const showPlates = p.kg != null && (ex.kind === "top" || ex.kind === "warmup" || /barra/i.test(ex.name));
   const loadBlock = p.kg != null
-    ? `<div><div class="load"><span class="kg num">${fmt(p.kg)}</span><span class="u">kg</span></div><div class="loadsrc">${esc(p.src)}</div></div>${showPlates ? plateHTML(p.kg) : ""}`
-    : ex.kind === "mobility" ? "" : `<div class="loadsrc">${esc(p.src || "Carga livre")} — você informa no fim do exercício.</div>`;
-  return `${bar}
-    <div><div class="eyebrow">${esc(sess.name)}${sess.focus ? " · " + esc(sess.focus) : ""}</div>
-      <div class="exname" style="margin-top:4px">${esc(ex.name)}</div>
-      <div class="tags"><span class="tag k-${ex.kind}">${kindLabel}</span><span class="tag">Série ${st.set} de ${ex.sets}</span><span class="tag">Pausa ${restLabel(ex)}</span></div></div>
-    ${spec ? `<div class="anim"><canvas id="fig" width="112" height="64" role="img" aria-label="Animação: ${esc(ex.name)}"></canvas>
-      <div class="phases">${spec.phases.filter(p=>p.label).map((p,i)=>`<span data-i="${spec.phases.indexOf(p)}">${esc(p.label)}</span>`).join("")}</div></div>` : ""}
-    <div class="hero">
-      <div class="reps"><div><span class="l">Reps</span><div class="num">${esc(repsLabel(ex.reps))}</div></div>
-        ${r.workEnd ? `<div><span class="l">Tempo</span><div class="num" id="wt">${mmss((r.workEnd-Date.now())/1000)}</div></div>` : ""}</div>
-      ${loadBlock}
-      ${ex.note ? `<div class="note">${esc(ex.note)}</div>` : ""}
-      ${spec ? "" : `<a class="demo" href="${demoURL(ex.name)}" target="_blank" rel="noopener">Ver demonstração do movimento ↗</a>`}
-    </div>
-    <div class="dock">${videoEligible(ex, st) ? `<label class="btn rec" for="cam"><span class="dot" aria-hidden="true"></span>Filmar a última série</label><input id="cam" type="file" accept="video/*" capture="environment" hidden onchange="onVideo(this.files[0])">` : ""}${timeReps && !r.workEnd ? `<button class="big" onclick="startWorkTimer(${parseInt(ex.reps)})">Iniciar ${parseInt(ex.reps)} s</button>` : `<button class="big ok" onclick="finishSet()">Série feita</button>`}
-    <div class="navs"><button onclick="stepNav(-1)">‹ Série anterior</button><button onclick="stepNav(1)">Pular série ›</button></div></div>`;
+    ? `<div class="loadrow px"><div class="head"><span class="eyebrow">Carga</span><span class="kg">${fmt(p.kg)}<small>kg</small></span></div>
+       <div class="loadsrc">${esc(p.src)}</div>${showPlates ? plateHTML(p.kg) : ""}</div>`
+    : ex.kind === "mobility" ? "" : `<div class="loadrow px"><div class="head"><span class="eyebrow">Carga</span><span class="kg" style="font-size:24px">livre</span></div><div class="loadsrc">${esc(p.src && p.src !== "carga livre" ? p.src + " · " : "")}você informa no fim do exercício.</div></div>`;
+  const repsTxt = timeReps ? (r.workEnd ? mmss((r.workEnd-Date.now())/1000) : parseInt(ex.reps) + "s") : repsLabel(ex.reps);
+  const repsLbl = timeReps ? (r.workEnd ? "tempo" : "iniciar") : "reps";
+  const repsAttrs = timeReps && !r.workEnd ? `onclick="startWorkTimer(${parseInt(ex.reps)})" role="button" tabindex="0" aria-label="Iniciar ${parseInt(ex.reps)} segundos"` : "";
+  return `${hud}
+    <div class="stage px">${spec ? `<canvas id="fig" width="112" height="64" role="img" aria-label="Animação: ${esc(ex.name)}"></canvas>` : ""}
+      <div class="cap"><span class="tagcur ${ex.kind}">${kindLabel}</span>
+        <div class="exname">${esc(ex.name)}</div><div class="underline"></div>
+        ${spec ? `<div class="phases">${spec.phases.filter(p=>p.label).map(p=>`<span data-i="${spec.phases.indexOf(p)}">${esc(p.label)}</span>`).join("")}</div>` : ""}
+        <div class="setline"><span class="chip">Série ${st.set} de ${ex.sets}</span><span class="chip">Pausa ${restLabel(ex)}</span></div></div></div>
+    ${ex.note ? `<div class="tip px"><div class="eyebrow">Dica do treinador</div><p>${esc(ex.note)}</p></div>` : ""}
+    ${loadBlock}
+    ${spec ? "" : `<a class="demo" href="${demoURL(ex.name)}" target="_blank" rel="noopener">Ver demonstração do movimento ↗</a>`}
+    <div class="dock">${videoEligible(ex, st) ? `<label class="btn rec" for="cam"><span class="dot" aria-hidden="true"></span>Filmar a última série</label><input id="cam" type="file" accept="video/*" capture="environment" hidden onchange="onVideo(this.files[0])">` : ""}
+      <div class="controls">
+        <button class="ctl" onclick="stepNav(-1)"><span class="sq">${ICON_BACK}</span>Anterior</button>
+        <div class="reps${timeReps ? " time" : ""}" ${repsAttrs}>${ringSVG(28, 6)}<div><div class="n${String(repsTxt).length > 4 ? " small" : ""}" id="wt">${esc(repsTxt)}</div><span class="l">${repsLbl}</span></div></div>
+        <button class="ctl" onclick="finishSet()"><span class="sq go">${ICON_CHECK}</span>Feito</button>
+      </div>
+      <div class="navs"><span></span><button onclick="stepNav(1)">Pular série ›</button></div></div>`;
 }
 
 function render(){
@@ -480,15 +509,15 @@ function selectTopic(){ const el = document.getElementById("topic"); if (el) { c
 function settingsView(){
   const plateChips = PLATE_DEFS.map(p => `<button class="chip" aria-pressed="${S.settings.plates.includes(p.kg)}" onclick="togglePlate(${p.kg})">${fmt(p.kg)}</button>`).join("");
   return `
-  <div class="pbar"><button class="x" onclick="goHome()" aria-label="Voltar">${ICON_X}</button><h1 class="exname" style="font-size:30px;flex:1">Ajustes</h1></div>
-  <section class="card"><div class="eyebrow">Planilha do treinador</div>
+  <div class="hud"><button class="btn iconbtn" onclick="goHome()" aria-label="Voltar">${ICON_X}</button><h1 class="exname grow">Ajustes</h1></div>
+  <section class="card px"><div class="eyebrow">Planilha do treinador</div>
     <p class="help">Cole o endereço do Apps Script (termina em <code>/exec</code>) e o token que o <code>setup()</code> mostrou no log.</p>
     <label class="lbl" for="api">Endereço do Apps Script</label><input class="inp" id="api" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.settings.api)}">
     <label class="lbl" for="token">Token</label><input class="inp" id="token" type="password" autocomplete="off" value="${esc(S.settings.token)}">
     <div class="acts"><button class="btn primary" onclick="saveConn()">Salvar e conectar</button>${connected() ? `<button class="btn" onclick="importNow()">Buscar planilha agora</button>` : ""}</div>
     ${syncLine()}
   </section>
-  <section class="card"><div class="eyebrow">Avisos no celular</div>
+  <section class="card px"><div class="eyebrow">Avisos no celular</div>
     <p class="help">Com o app aberto, o próprio timer apita no fim do descanso. Para ser avisado com o iPhone bloqueado ou em outro app, o fim do descanso chega como notificação pelo app <b>ntfy</b>.</p>
     <div class="field"><label for="push">Avisar fim do descanso</label><input id="push" type="checkbox" ${S.settings.ntfyOn ? "checked" : ""} onchange="setPush(this.checked)"></div>
     ${S.settings.ntfyOn ? `<ol class="steps">
@@ -499,16 +528,16 @@ function settingsView(){
     <p class="help">O tópico funciona como senha: quem souber o nome vê os avisos. Não compartilhe.</p>
     <div class="acts"><button class="btn" onclick="testPush()">Enviar teste</button></div>` : ""}
   </section>
-  <section class="card"><div class="eyebrow">Tela</div>
+  <section class="card px"><div class="eyebrow">Tela</div>
     <div class="field"><label for="screen">Manter a tela acesa no treino</label><input id="screen" type="checkbox" ${S.settings.screenOn !== false ? "checked" : ""} onchange="setScreenOn(this.checked)"></div>
     <p class="help">Desligue para economizar bateria. Com a tela apagada, o aviso de descanso chega pelo ntfy.</p>
   </section>
-  <section class="card"><div class="eyebrow">Barra e anilhas da sua academia</div>
+  <section class="card px"><div class="eyebrow">Barra e anilhas da sua academia</div>
     <div class="field"><label for="bar">Barra</label><select id="bar" onchange="setSetting('bar',+this.value)">${[20,15,25].map(v=>`<option value="${v}" ${S.settings.bar===v?"selected":""}>${v} kg</option>`).join("")}</select></div>
     <div class="field"><label for="collar">Presilhas (cada)</label><select id="collar" onchange="setSetting('collar',+this.value)">${[0,2.5].map(v=>`<option value="${v}" ${S.settings.collar===v?"selected":""}>${v?fmt(v)+" kg (competição)":"sem peso"}</option>`).join("")}</select></div>
     <div class="field" style="flex-direction:column;align-items:flex-start"><span>Anilhas disponíveis (kg)</span><div class="chips">${plateChips}</div></div>
   </section>
-  <section class="card"><div class="eyebrow">Sem internet?</div>
+  <section class="card px"><div class="eyebrow">Sem internet?</div>
     <p class="help">Baixe a planilha como .xlsx e importe aqui. Os registros feitos offline ficam no celular e sobem quando a conexão voltar.</p>
     <label class="btn" for="xl" style="cursor:pointer;align-self:flex-start">Importar .xlsx</label><input id="xl" type="file" accept=".xlsx,.xls" hidden onchange="importXlsx(this.files[0])">
   </section>`;
@@ -590,13 +619,13 @@ function videoRow(v){
 }
 function videoCard(id){
   const v = id && VIDS.get(id);
-  return `<div id="vcard">${v ? `<div class="confirm vcard"><div class="eyebrow">Vídeo da última série</div>${videoRow(v)}</div>` : ""}</div>`;
+  return `<div id="vcard">${v ? `<div class="confirm px hot vcard"><div class="eyebrow">Vídeo da última série</div>${videoRow(v)}</div>` : ""}</div>`;
 }
 function refreshVideo(){ const el = document.getElementById("vcard"); if (el && S.run) el.outerHTML = videoCard(S.run.videoId); }
 function pendingVideos(){
   const list = [...VIDS.values()].filter(v => !v.meta.sent && (!S.run || S.run.videoId !== v.meta.id || S.view !== "play")).sort((a,b) => b.meta.ts - a.meta.ts);
   if (!list.length) return "";
-  return `<section><div class="eyebrow">Vídeos para salvar no celular</div><div class="card">${list.map(videoRow).join("")}</div></section>`;
+  return `<section><div class="eyebrow">Vídeos para salvar no celular</div><div class="card px">${list.map(videoRow).join("")}</div></section>`;
 }
 
 /* ---------- Início ---------- */
