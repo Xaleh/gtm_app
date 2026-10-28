@@ -515,8 +515,8 @@ function settingsView(){
 }
 
 /* ---------- Vídeo da última série do top set ---------- */
-// Usa a câmera nativa do iPhone (input com capture). O vídeo fica no IndexedDB do app até ser enviado,
-// porque a câmera aberta por um site não salva nada no rolo de fotos.
+// Usa a câmera nativa do iPhone (input com capture). A câmera aberta por um site não grava no app Fotos,
+// então o vídeo fica no IndexedDB do app até ser salvo pela folha de compartilhar ("Salvar Vídeo").
 const VIDS = new Map(); // id -> {meta, blob, url}
 const videoEligible = (ex, st) => ex.kind === "top" && ["S","B","D"].includes(ex.lift) && st.set === ex.sets;
 function idb(){
@@ -560,16 +560,17 @@ async function onVideo(file){
   catch(e) { toast("O vídeo não foi guardado no celular. Envie antes de fechar o app."); }
   finishSet();
 }
-async function shareVideo(id){
+async function saveVideo(id){
   const v = VIDS.get(id); if (!v) return;
   const file = new File([v.blob], v.meta.name, {type: v.meta.type});
-  if (!(navigator.canShare && navigator.canShare({files: [file]}))) { toast("Este navegador não envia vídeos. Abra o vídeo e use Compartilhar."); window.open(v.url, "_blank"); return; }
+  if (!(navigator.canShare && navigator.canShare({files: [file]}))) { toast("Abra o vídeo e use Compartilhar → Salvar Vídeo."); window.open(v.url, "_blank"); return; }
   try {
-    await navigator.share({files: [file], text: v.meta.text, title: v.meta.text});
+    // só o arquivo: com texto junto, o iPhone esconde a opção "Salvar Vídeo"
+    await navigator.share({files: [file]});
     v.meta.sent = Date.now();
     idbDo("readwrite", s => s.put(Object.assign({blob: v.blob}, v.meta))).catch(() => {});
-    toast("Vídeo enviado"); S.view === "play" ? refreshVideo() : render();
-  } catch(e) { if (e && e.name !== "AbortError") toast("Não consegui compartilhar: " + (e.message || e)); }
+    toast("Pronto. O vídeo está no app Fotos."); S.view === "play" ? refreshVideo() : render();
+  } catch(e) { if (e && e.name !== "AbortError") toast("Não consegui abrir o salvamento: " + (e.message || e)); }
 }
 function discardVideo(id){
   const v = VIDS.get(id); if (!v) return;
@@ -583,8 +584,8 @@ function videoRow(v){
   const m = v.meta;
   return `<div class="vrow">
     <video src="${v.url}#t=0.1" playsinline muted preload="metadata" controls></video>
-    <div class="vinfo"><div class="vt">${esc(m.text)}</div><div class="muted" style="font-size:12px">${mb(m.size)}${m.sent ? " · enviado" : ""}</div>
-      <div class="acts">${m.sent ? `<button class="btn" onclick="shareVideo('${m.id}')">Enviar de novo</button>` : `<button class="btn primary" onclick="shareVideo('${m.id}')">Enviar ao treinador</button>`}
+    <div class="vinfo"><div class="vt">${esc(m.text)}</div>${m.sent ? "" : `<div class="muted" style="font-size:12px">Na tela que abrir, toque em <b>Salvar Vídeo</b>.</div>`}<div class="muted" style="font-size:12px">${mb(m.size)}${m.sent ? " · salvo no celular" : ""}</div>
+      <div class="acts">${m.sent ? `<button class="btn" onclick="saveVideo('${m.id}')">Salvar de novo</button>` : `<button class="btn primary" onclick="saveVideo('${m.id}')">Salvar no celular</button>`}
       <button class="btn ghost" onclick="discardVideo('${m.id}')">${m.confirmDelete ? "Apagar mesmo?" : "Apagar"}</button></div></div></div>`;
 }
 function videoCard(id){
@@ -595,7 +596,7 @@ function refreshVideo(){ const el = document.getElementById("vcard"); if (el && 
 function pendingVideos(){
   const list = [...VIDS.values()].filter(v => !v.meta.sent && (!S.run || S.run.videoId !== v.meta.id || S.view !== "play")).sort((a,b) => b.meta.ts - a.meta.ts);
   if (!list.length) return "";
-  return `<section><div class="eyebrow">Vídeos para enviar ao treinador</div><div class="card">${list.map(videoRow).join("")}</div></section>`;
+  return `<section><div class="eyebrow">Vídeos para salvar no celular</div><div class="card">${list.map(videoRow).join("")}</div></section>`;
 }
 
 /* ---------- Início ---------- */

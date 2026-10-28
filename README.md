@@ -7,7 +7,7 @@ Player de treino de powerlifting alimentado pela planilha semanal do treinador n
 - Mostra as anilhas por lado, o timer de descanso com alerta e a carga da próxima série para montar a barra.
 - Anima em pixel art todos os 25 movimentos que já apareceram na planilha, seguindo a variação (pausa, descida lenta, pausa no joelho, touch'n go, paralímpico).
 - No fim de cada exercício confirma a carga usada; se mudou num top set, oferece atualizar o PR.
-- Na última série de cada top set de agachamento, supino e terra, abre a câmera para filmar. O vídeo fica guardado no app até você enviar ao treinador pela folha de compartilhar do iPhone, já com nome e legenda (exercício, séries, carga, semana e data).
+- Na última série de cada top set de agachamento, supino e terra, abre a câmera para filmar. O vídeo fica guardado no app até você salvar no app Fotos (folha de compartilhar → Salvar Vídeo), com o nome do arquivo indicando exercício, carga, séries e data. Daí você envia ao treinador quando quiser.
 - Avisa o fim do descanso no celular: com o app aberto, pelo próprio timer; com o iPhone bloqueado, por notificação do app ntfy.
 - Funciona offline na academia: os registros ficam no celular e sobem quando a conexão volta.
 
