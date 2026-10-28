@@ -445,17 +445,20 @@ async function sheetsGet(path, params){
   try { res = await fetch(u, {cache: "no-store"}); } catch (e) { throw new Error("Sem internet agora. Os treinos da última leitura continuam aqui."); }
   if (res.ok) return res.json();
   let msg = ""; try { msg = ((await res.json()).error || {}).message || ""; } catch (e) {}
-  if (/referer|api key|api_key|has not been used|disabled|billing/i.test(msg)) throw new Error("O Google recusou a chave do app. Avise quem mantém o GTM.");
+  const detail = msg ? ` (Google: ${msg})` : ` (Google: erro ${res.status})`;
+  if (/not supported for this document/i.test(msg)) throw new Error("Esse link é de um arquivo Excel (.xlsx) guardado no Drive, que o Google não deixa ler por link. Peça ao treinador para abrir o arquivo e usar Arquivo → Salvar como Planilhas Google, e passar a editar essa versão. Ou use Importar planilha (.xlsx).");
+  if (/referer|api key|api_key|has not been used|disabled|billing/i.test(msg)) throw new Error("O Google recusou a chave do app. Avise quem mantém o GTM." + detail);
   if (res.status === 403 || res.status === 401) throw new Error("A planilha não está aberta por link. Peça ao treinador: Compartilhar → Qualquer pessoa com o link → Leitor.");
-  if (res.status === 404 || res.status === 400) throw new Error("Não achei essa planilha. Confira o link que o treinador mandou.");
+  if (res.status === 404) throw new Error("Não achei essa planilha. Confira o link que o treinador mandou.");
   if (res.status === 429) throw new Error("Muitas leituras seguidas. Tente de novo em um minuto.");
-  throw new Error("O Google respondeu " + res.status + ". Tente de novo mais tarde.");
+  throw new Error("Não consegui ler a planilha. Tente de novo; se continuar, mande esta mensagem para quem mantém o GTM." + detail);
 }
 async function fetchLinkedWeek(){
   const meta = await sheetsGet("", {fields: "properties.title,sheets.properties(title,index,hidden)"});
   const first = (meta.sheets || []).map(s => s.properties).filter(p => !p.hidden).sort((a, b) => a.index - b.index)[0];
   if (!first) throw new Error("A planilha está vazia.");
-  const range = "/values/" + encodeURIComponent(`'${first.title.replace(/'/g, "''")}'!A1:Z300`);
+  // a aba inteira: pedir um intervalo maior que a aba (ex.: A1:Z300 numa aba de 21 colunas) faz o Google recusar
+  const range = "/values/" + encodeURIComponent(`'${first.title.replace(/'/g, "''")}'`);
   const [v, f] = await Promise.all([sheetsGet(range, {valueRenderOption: "UNFORMATTED_VALUE"}), sheetsGet(range, {valueRenderOption: "FORMULA"})]);
   const data = TreinoParser.parseSheet(TreinoParser.fromApi(v.values, f.values), first.title);
   if (!data.sessions.length) throw new Error(`Não achei treinos na primeira aba ("${first.title}"). A semana atual precisa ser a primeira aba.`);
