@@ -91,6 +91,16 @@ Como funciona: ao concluir uma série, o app agenda duas mensagens no ntfy, uma 
 
 O tópico funciona como senha: quem souber o nome consegue ler e mandar mensagens nele. Não compartilhe.
 
+## Usar só com o .xlsx (sem Apps Script)
+
+Para outra pessoa usar o app, basta mandar o link do GitHub Pages. Ela adiciona à tela de início e importa a planilha em .xlsx pelo botão **Importar planilha (.xlsx)** da tela inicial. Não precisa de Apps Script nem token.
+
+- A planilha precisa seguir o mesmo modelo (PRs em I5/I8/I11, cargas por `MROUND`), com a semana atual na primeira aba.
+- No Planilhas Google do iPhone: **Compartilhar e exportar → Enviar uma cópia → Excel (.xlsx)**, salvando em Arquivos.
+- PRs, histórico, cargas e vídeos ficam só naquele celular, sem backup. Apagar os dados do Safari ou remover o app apaga tudo.
+- A importação precisa de internet (o leitor de .xlsx é baixado na hora). Depois o treino funciona offline.
+- Os PRs seguem a mesma regra descrita abaixo, comparando com a importação anterior.
+
 ## Como o PR é atualizado
 
 O PR pode mudar por dois caminhos, e a planilha de dados guarda os dois:

@@ -205,6 +205,16 @@ function estMinutes(s){ return Math.round(s.exercises.reduce((t, e) => t + e.set
 
 // "SEMANA 20" → número em laranja, como o destaque da referência
 const weekTitle = w => esc(w).replace(/(\d+)\s*$/, "<em>$1</em>");
+const XLSX_INPUT = id => `<input id="${id}" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onchange="importXlsx(this.files[0])">`;
+function importCard(){
+  if (isSample()) return `<section class="card px hot"><div class="eyebrow">Comece pela sua planilha</div>
+    <p class="help">Importe a planilha do treinador em .xlsx e o app monta os treinos da semana com as suas cargas. Até lá, você vê uma semana de exemplo.</p>
+    <label class="btn primary" for="xl-home" style="align-self:flex-start">Importar planilha (.xlsx)</label>${XLSX_INPUT("xl-home")}
+    <p class="help">No Planilhas Google do iPhone: <b>Compartilhar e exportar → Enviar uma cópia → Excel (.xlsx)</b> e salve em Arquivos. A semana atual precisa ser a primeira aba.</p>
+    <p class="help">Prefere que a semana nova chegue sozinha toda segunda? Conecte em <a href="#" onclick="openSettings();return false" style="color:var(--accent)">Ajustes</a>.</p></section>`;
+  return `<section class="card px"><div class="eyebrow">Semana nova do treinador?</div>
+    <label class="btn" for="xl-home" style="align-self:flex-start">Importar planilha (.xlsx)</label>${XLSX_INPUT("xl-home")}</section>`;
+}
 function homeView(){
   const d = S.data, total = (S.prs.S||0) + (S.prs.B||0) + (S.prs.D||0);
   const prTiles = ["S","B","D"].map(l => S.editPR === l
@@ -229,8 +239,10 @@ function homeView(){
     <button class="btn iconbtn" onclick="openSettings()" aria-label="Ajustes">${ICON_GEAR}</button></header>
   <div class="week"><div class="eyebrow">${esc(d.athlete || "Atleta")} · powerlifting</div><h1>${weekTitle(d.week)}</h1>
     <div class="src">Planilha: aba “${esc(d.sheet)}”</div>${syncLine()}</div>
+  ${!connected() && isSample() ? importCard() : ""}
   <section><div class="eyebrow">PRs · total ${fmt(total)} kg</div><div class="prs">${prTiles}</div>
     <div class="prnote" style="margin-top:6px"><span>Toque para editar. As cargas de top set recalculam na hora.</span></div></section>
+  ${!connected() && !isSample() ? importCard() : ""}
   ${resume}
   ${pendingVideos()}
   <section><div class="eyebrow">Treinos da semana</div><div class="sessions">${sess}</div></section>
@@ -375,6 +387,7 @@ function toast(msg){ let t = document.querySelector(".toast"); if (!t) { t = doc
 function loadSheetJS(){
   return new Promise((res, rej) => { if (window.XLSX) return res(); const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = res; s.onerror = () => rej(new Error("load")); document.head.appendChild(s); });
 }
+const isSample = () => S.data.sheet === "EXEMPLO";
 async function importXlsx(file){
   if (!file) return;
   try {
@@ -384,11 +397,19 @@ async function importXlsx(file){
     const name = wb.SheetNames[0];
     const data = TreinoParser.parseSheet(wb.Sheets[name], name);
     if (!data.sessions.length) { toast("Não achei treinos na primeira aba"); return; }
-    const kept = [];
-    for (const l of ["S","B","D"]) { if (S.prs[l] > data.prs[l]) kept.push(LIFTS[l].toLowerCase()); else S.prs[l] = data.prs[l]; }
-    S.data = data; save("data", data); save("prs", S.prs);
-    render();
-    toast(`Importado: ${data.week}` + (kept.length ? ` · mantive seu PR maior de ${kept.join(", ")}` : ""));
+    // Mesma regra do Apps Script: o PR da planilha vale quando muda em relação à última importação;
+    // se o treinador repetiu o número, continua valendo o ajuste feito no app.
+    const lastSheet = isSample() ? null : load("sheetPrs", null), kept = [];
+    for (const l of ["S","B","D"]) {
+      const sheetKg = Number(data.prs[l]) || 0;
+      if (lastSheet && Number(lastSheet[l]) === sheetKg && S.prs[l] !== sheetKg) { kept.push(LIFTS[l].toLowerCase()); continue; }
+      if (S.prs[l] !== sheetKg && !isSample()) S.prHist.unshift({id: uid(), ts: Date.now(), lift: l, from: S.prs[l], to: sheetKg, why: "planilha importada"});
+      S.prs[l] = sheetKg;
+    }
+    save("sheetPrs", data.prs); save("prHist", S.prHist);
+    S.data = data; save("data", data); save("prs", S.prs); save("importedAt", Date.now());
+    S.view = "home"; render(); window.scrollTo(0, 0);
+    toast(`Importado: ${data.week}` + (kept.length ? ` · mantive seu PR ajustado de ${kept.join(", ")}` : ""));
   } catch(e) { toast("Não consegui ler esse arquivo. Exporte a planilha como .xlsx e tente de novo."); }
 }
 
@@ -442,7 +463,7 @@ async function importNow(){
 }
 function syncLine(){
   let txt, cls = "muted";
-  if (!connected()) txt = "Semana de exemplo. Conecte sua planilha em Ajustes.";
+  if (!connected()) { const at = load("importedAt", null); txt = isSample() ? "" : "Planilha importada do celular" + (at ? " · " + new Date(at).toLocaleString("pt-BR", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"}) : ""); }
   else if (S.sync.state === "busy") txt = "Sincronizando…";
   else if (S.sync.state === "error") { txt = S.queue.length ? `${S.queue.length} registro(s) guardado(s) no celular, envio quando houver conexão.` : "Sem conexão com a planilha agora."; cls = "down"; }
   else txt = (S.queue.length ? `${S.queue.length} registro(s) para enviar · ` : "") + (S.sync.last ? "Sincronizado " + new Date(S.sync.last).toLocaleString("pt-BR", {weekday:"short", hour:"2-digit", minute:"2-digit"}) : "Conectado");
@@ -511,7 +532,7 @@ function settingsView(){
   return `
   <div class="hud"><button class="btn iconbtn" onclick="goHome()" aria-label="Voltar">${ICON_X}</button><h1 class="exname grow">Ajustes</h1></div>
   <section class="card px"><div class="eyebrow">Planilha do treinador</div>
-    <p class="help">Cole o endereço do Apps Script (termina em <code>/exec</code>) e o token que o <code>setup()</code> mostrou no log.</p>
+    <p class="help">Opcional. Conectando ao Apps Script, a semana nova chega sozinha e PRs e histórico ficam guardados numa planilha sua. Cole o endereço (termina em <code>/exec</code>) e o token que o <code>setup()</code> mostrou no log.</p>
     <label class="lbl" for="api">Endereço do Apps Script</label><input class="inp" id="api" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.settings.api)}">
     <label class="lbl" for="token">Token</label><input class="inp" id="token" type="password" autocomplete="off" value="${esc(S.settings.token)}">
     <div class="acts"><button class="btn primary" onclick="saveConn()">Salvar e conectar</button>${connected() ? `<button class="btn" onclick="importNow()">Buscar planilha agora</button>` : ""}</div>
@@ -537,9 +558,9 @@ function settingsView(){
     <div class="field"><label for="collar">Presilhas (cada)</label><select id="collar" onchange="setSetting('collar',+this.value)">${[0,2.5].map(v=>`<option value="${v}" ${S.settings.collar===v?"selected":""}>${v?fmt(v)+" kg (competição)":"sem peso"}</option>`).join("")}</select></div>
     <div class="field" style="flex-direction:column;align-items:flex-start"><span>Anilhas disponíveis (kg)</span><div class="chips">${plateChips}</div></div>
   </section>
-  <section class="card px"><div class="eyebrow">Sem internet?</div>
-    <p class="help">Baixe a planilha como .xlsx e importe aqui. Os registros feitos offline ficam no celular e sobem quando a conexão voltar.</p>
-    <label class="btn" for="xl" style="cursor:pointer;align-self:flex-start">Importar .xlsx</label><input id="xl" type="file" accept=".xlsx,.xls" hidden onchange="importXlsx(this.files[0])">
+  <section class="card px"><div class="eyebrow">Importar planilha (.xlsx)</div>
+    <p class="help">Para usar sem conectar ao Apps Script, ou quando a conexão falhar. Exporte a planilha do treinador como .xlsx (a semana atual na primeira aba) e importe aqui. Sem conexão, tudo fica salvo só neste celular.</p>
+    <label class="btn" for="xl" style="cursor:pointer;align-self:flex-start">Importar planilha (.xlsx)</label>${XLSX_INPUT("xl")}
   </section>`;
 }
 
