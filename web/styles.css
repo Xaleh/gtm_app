@@ -1,3 +1,4 @@
+*,*::before,*::after{box-sizing:border-box}
 /* Layout: uma coluna de app de academia — números enormes, botões do tamanho do polegar, discos desenhados como na barra. */
 :root{
   --bg:#EEF0F3; --surface:#FFFFFF; --sunken:#E2E6EC; --line:#CDD3DC;
@@ -147,3 +148,12 @@ details.set summary{font-weight:600;cursor:pointer}
 .card .acts{display:flex;gap:8px;flex-wrap:wrap}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .field input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent)}
+/* Vídeo da última série */
+.btn.rec{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;font-size:15px;border-color:var(--bad);color:var(--bad);background:var(--surface);cursor:pointer}
+.btn.rec .dot{width:12px;height:12px;border-radius:50%;background:var(--bad)}
+.vrow{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start}
+.vrow + .vrow{border-top:1px solid var(--line);padding-top:10px}
+.vrow video{width:96px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:var(--sunken)}
+.vinfo{min-width:0;display:flex;flex-direction:column;gap:6px}
+.vt{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.vinfo .acts{display:flex;gap:8px;flex-wrap:wrap}

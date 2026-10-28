@@ -223,6 +223,7 @@ function homeView(){
   <section><div class="eyebrow">PRs · total ${fmt(total)} kg</div><div class="prs">${prTiles}</div>
     <div class="prnote" style="margin-top:6px"><span>Toque para editar. As cargas de top set recalculam na hora.</span></div></section>
   ${resume}
+  ${pendingVideos()}
   <section><div class="eyebrow">Treinos da semana</div><div class="sessions">${sess}</div></section>
   ${hist.length ? `<section><div class="eyebrow">Últimos registros</div><div class="hist">${hist.map(h=>`<div>${h.html}</div>`).join("")}</div></section>` : ""}
   `;
@@ -256,7 +257,7 @@ function playView(){
 
   if (r.phase === "done") {
     const rows = r.results.map(e => `<div><span>${esc(e.ex)}<br><span class="muted" style="font-size:12px">${e.sets}×${esc(repsLabel(e.reps))}</span></span><span class="num" style="font-size:20px">${fmt(e.actual)} kg</span></div>`).join("");
-    return `${bar}${confirmHTML()}<div><div class="eyebrow">${esc(sess.name)}</div><div class="exname" style="font-size:44px">Treino concluído</div></div>
+    return `${bar}${confirmHTML()}${videoCard(r.videoId)}<div><div class="eyebrow">${esc(sess.name)}</div><div class="exname" style="font-size:44px">Treino concluído</div></div>
       ${rows ? `<div class="summary">${rows}</div>` : ""}
       <button class="big" onclick="closeRun()">Voltar para a semana</button>`;
   }
@@ -277,6 +278,7 @@ function playView(){
       <div class="muted" style="font-size:12px">Pausa da planilha: ${restLabel(sess.exercises[prev.ei])}</div>
     </div>
     ${confirmHTML()}
+    ${videoCard(r.videoId)}
     <div class="next"><div class="eyebrow">${exChange ? "Próximo exercício · monte a barra" : "Próxima série"}</div>
       <div class="row"><div style="min-width:0"><div style="font-weight:600">${esc(nex.name)}</div><div class="muted" style="font-size:13px">Série ${nst.set} de ${nex.sets} · ${esc(repsLabel(nex.reps))} reps</div></div>
       ${np.kg != null ? `<div style="text-align:right"><span class="kg num">${fmt(np.kg)}</span><span class="muted"> kg</span></div>` : ""}</div>
@@ -304,7 +306,7 @@ function playView(){
       ${ex.note ? `<div class="note">${esc(ex.note)}</div>` : ""}
       ${spec ? "" : `<a class="demo" href="${demoURL(ex.name)}" target="_blank" rel="noopener">Ver demonstração do movimento ↗</a>`}
     </div>
-    <div class="dock">${timeReps && !r.workEnd ? `<button class="big" onclick="startWorkTimer(${parseInt(ex.reps)})">Iniciar ${parseInt(ex.reps)} s</button>` : `<button class="big ok" onclick="finishSet()">Série feita</button>`}
+    <div class="dock">${videoEligible(ex, st) ? `<label class="btn rec" for="cam"><span class="dot" aria-hidden="true"></span>Filmar a última série</label><input id="cam" type="file" accept="video/*" capture="environment" hidden onchange="onVideo(this.files[0])">` : ""}${timeReps && !r.workEnd ? `<button class="big" onclick="startWorkTimer(${parseInt(ex.reps)})">Iniciar ${parseInt(ex.reps)} s</button>` : `<button class="big ok" onclick="finishSet()">Série feita</button>`}
     <div class="navs"><button onclick="stepNav(-1)">‹ Série anterior</button><button onclick="stepNav(1)">Pular série ›</button></div></div>`;
 }
 
@@ -512,7 +514,92 @@ function settingsView(){
   </section>`;
 }
 
+/* ---------- Vídeo da última série do top set ---------- */
+// Usa a câmera nativa do iPhone (input com capture). O vídeo fica no IndexedDB do app até ser enviado,
+// porque a câmera aberta por um site não salva nada no rolo de fotos.
+const VIDS = new Map(); // id -> {meta, blob, url}
+const videoEligible = (ex, st) => ex.kind === "top" && ["S","B","D"].includes(ex.lift) && st.set === ex.sets;
+function idb(){
+  return new Promise((res, rej) => {
+    const rq = indexedDB.open("gtm", 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore("videos", {keyPath: "id"});
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbDo(mode, fn){
+  const db = await idb();
+  return new Promise((res, rej) => { const tx = db.transaction("videos", mode), st = tx.objectStore("videos"); const out = fn(st); tx.oncomplete = () => res(out && out.result); tx.onerror = () => rej(tx.error); });
+}
+async function loadVideos(){
+  try {
+    const all = await idbDo("readonly", st => st.getAll());
+    const weekAgo = Date.now() - 7*864e5;
+    for (const v of all || []) {
+      if (v.sent && v.sent < weekAgo) { idbDo("readwrite", st => st.delete(v.id)); continue; }
+      if (!VIDS.has(v.id)) VIDS.set(v.id, {meta: v, blob: v.blob, url: URL.createObjectURL(v.blob)});
+    }
+    if (S.view !== "play") render(); else refreshVideo();
+  } catch(e) {}
+}
+function videoMeta(ex, kg){
+  const d = new Date(), day = d.toLocaleDateString("pt-BR", {day:"2-digit", month:"2-digit"});
+  const reps = `${ex.sets}×${repsLabel(ex.reps)}`;
+  const text = `${ex.name} · ${reps}${kg != null ? " · " + fmt(kg) + " kg" : ""} · ${S.data.week} · ${day}`;
+  const base = `${LIFTS[ex.lift]} ${kg != null ? fmt(kg).replace(",", "_") + "kg " : ""}${reps} ${day.replace("/", "-")}`.replace(/[^\w ×.-]+/g, "").replace(/\s+/g, " ").trim();
+  return {text, base};
+}
+async function onVideo(file){
+  if (!file) return;
+  audioOn();
+  const {sess, st, ex} = curEx(), kg = loadFor(sess, st.ei).kg, m = videoMeta(ex, kg);
+  const ext = /quicktime/.test(file.type) ? "mov" : (file.name.split(".").pop() || "mp4").toLowerCase();
+  const meta = {id: uid(), ts: Date.now(), name: `${m.base}.${ext}`, type: file.type || "video/mp4", text: m.text, size: file.size, sheet: S.data.sheet, sent: null};
+  VIDS.set(meta.id, {meta, blob: file, url: URL.createObjectURL(file)});
+  S.run.videoId = meta.id;
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); await idbDo("readwrite", s => s.put(Object.assign({blob: file}, meta))); }
+  catch(e) { toast("O vídeo não foi guardado no celular. Envie antes de fechar o app."); }
+  finishSet();
+}
+async function shareVideo(id){
+  const v = VIDS.get(id); if (!v) return;
+  const file = new File([v.blob], v.meta.name, {type: v.meta.type});
+  if (!(navigator.canShare && navigator.canShare({files: [file]}))) { toast("Este navegador não envia vídeos. Abra o vídeo e use Compartilhar."); window.open(v.url, "_blank"); return; }
+  try {
+    await navigator.share({files: [file], text: v.meta.text, title: v.meta.text});
+    v.meta.sent = Date.now();
+    idbDo("readwrite", s => s.put(Object.assign({blob: v.blob}, v.meta))).catch(() => {});
+    toast("Vídeo enviado"); S.view === "play" ? refreshVideo() : render();
+  } catch(e) { if (e && e.name !== "AbortError") toast("Não consegui compartilhar: " + (e.message || e)); }
+}
+function discardVideo(id){
+  const v = VIDS.get(id); if (!v) return;
+  if (!v.meta.confirmDelete) { v.meta.confirmDelete = true; S.view === "play" ? refreshVideo() : render(); return; }
+  URL.revokeObjectURL(v.url); VIDS.delete(id); idbDo("readwrite", s => s.delete(id)).catch(() => {});
+  if (S.run && S.run.videoId === id) S.run.videoId = null;
+  S.view === "play" ? refreshVideo() : render();
+}
+const mb = n => (n / 1048576).toLocaleString("pt-BR", {maximumFractionDigits: 1}) + " MB";
+function videoRow(v){
+  const m = v.meta;
+  return `<div class="vrow">
+    <video src="${v.url}#t=0.1" playsinline muted preload="metadata" controls></video>
+    <div class="vinfo"><div class="vt">${esc(m.text)}</div><div class="muted" style="font-size:12px">${mb(m.size)}${m.sent ? " · enviado" : ""}</div>
+      <div class="acts">${m.sent ? `<button class="btn" onclick="shareVideo('${m.id}')">Enviar de novo</button>` : `<button class="btn primary" onclick="shareVideo('${m.id}')">Enviar ao treinador</button>`}
+      <button class="btn ghost" onclick="discardVideo('${m.id}')">${m.confirmDelete ? "Apagar mesmo?" : "Apagar"}</button></div></div></div>`;
+}
+function videoCard(id){
+  const v = id && VIDS.get(id);
+  return `<div id="vcard">${v ? `<div class="confirm vcard"><div class="eyebrow">Vídeo da última série</div>${videoRow(v)}</div>` : ""}</div>`;
+}
+function refreshVideo(){ const el = document.getElementById("vcard"); if (el && S.run) el.outerHTML = videoCard(S.run.videoId); }
+function pendingVideos(){
+  const list = [...VIDS.values()].filter(v => !v.meta.sent && (!S.run || S.run.videoId !== v.meta.id || S.view !== "play")).sort((a,b) => b.meta.ts - a.meta.ts);
+  if (!list.length) return "";
+  return `<section><div class="eyebrow">Vídeos para enviar ao treinador</div><div class="card">${list.map(videoRow).join("")}</div></section>`;
+}
+
 /* ---------- Início ---------- */
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 render();
 if (connected()) flush();
+loadVideos();
