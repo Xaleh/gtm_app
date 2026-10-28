@@ -322,7 +322,7 @@ function playView(){
   const repsLbl = timeReps ? (r.workEnd ? "tempo" : "iniciar") : "reps";
   const repsAttrs = timeReps && !r.workEnd ? `onclick="startWorkTimer(${parseInt(ex.reps)})" role="button" tabindex="0" aria-label="Iniciar ${parseInt(ex.reps)} segundos"` : "";
   return `${hud}
-    <div class="stage px">${spec ? `<canvas id="fig" width="112" height="64" role="img" aria-label="Animação: ${esc(ex.name)}"></canvas>` : ""}
+    <div class="stage px">${spec ? `<canvas id="fig" width="112" height="64" role="button" tabindex="0" aria-label="Animação: ${esc(ex.name)}. Toque para pausar ou retomar." onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"></canvas>` : ""}
       <div class="cap"><span class="tagcur ${ex.kind}">${kindLabel}</span>
         <div class="exname">${esc(ex.name)}</div><div class="underline"></div>
         ${spec ? `<div class="phases">${spec.phases.filter(p=>p.label).map(p=>`<span data-i="${spec.phases.indexOf(p)}">${esc(p.label)}</span>`).join("")}</div>` : ""}

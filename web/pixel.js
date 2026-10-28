@@ -459,14 +459,16 @@
       while (t > o.phases[i].dur && i < o.phases.length - 1) { t -= o.phases[i].dur; i++; }
       const ph = o.phases[i]; return [lerp(ph.from, ph.to, ease(Math.min(1, t / ph.dur))), i];
     };
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const k = o.phases.findIndex(x => x.from !== x.to); const ph = o.phases[Math.max(0, k)];
-      draw(ctx, img, o, ph.to, col); onPhase && onPhase(Math.max(0, k)); return o;
-    }
-    const t0 = performance.now(); let lastF = -1, lastI = -1;
+    // A animação é a demonstração do exercício, então roda mesmo com "Reduzir Movimento" ligado.
+    // Um toque nela pausa e retoma.
+    let clockMs = 0, last = performance.now(), paused = false, lastF = -1, lastI = -1;
+    canvas.onclick = () => { paused = !paused; canvas.classList.toggle("paused", paused); canvas.setAttribute("aria-pressed", String(paused)); };
+    canvas.setAttribute("aria-pressed", "false");
     const loop = now => {
       if (!canvas.isConnected) return;
-      const f = Math.floor((now - t0) / 1000 * FPS);
+      if (!paused) clockMs += Math.min(now - last, 250);
+      last = now;
+      const f = Math.floor(clockMs / 1000 * FPS);
       if (f !== lastF) { lastF = f; const [p, i] = at(f / FPS); draw(ctx, img, o, p, col); if (i !== lastI) { lastI = i; onPhase && onPhase(i); } }
       raf = requestAnimationFrame(loop);
     };
