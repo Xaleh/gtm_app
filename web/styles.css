@@ -229,3 +229,17 @@ section > .eyebrow{margin-bottom:10px}
 .reps rect{fill:var(--line2)}
 .reps.time rect{fill:var(--accent)}
 .stage canvas.paused{filter:grayscale(.7) brightness(.7)}
+/* planilha por link e histórico */
+.linkrow{display:flex;gap:6px;align-items:center}
+.linkrow .inp{flex:1;min-width:0;font-size:14px}
+.linkbtn{font-family:var(--label);font-size:15px;letter-spacing:.02em;text-transform:uppercase;color:var(--accent);padding:2px 0;text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:0}
+.sechead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+details > summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+details > summary::after{content:"+";font-family:var(--label);font-size:18px;color:var(--accent)}
+details[open] > summary::after{content:"–"}
+details[open] > summary{margin-bottom:10px}
+details{display:flex;flex-direction:column;gap:10px}
+details[open]{display:flex}
+.formerr{margin:0;font-size:13px;color:var(--warn);border-left:4px solid var(--warn);padding-left:8px}
+.btn[disabled]{opacity:.6}
+a.btn{text-decoration:none}

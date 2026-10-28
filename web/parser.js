@@ -97,6 +97,20 @@
     ws["!ref"] = "A1:" + colName(Math.max(0, cols - 1)) + Math.max(1, rows);
     return ws;
   }
-  root.TreinoParser = { parseSheet, parseRest, fromGrid };
+  // Resposta da API do Google Sheets (values.get): as linhas vêm sem as células vazias do fim,
+  // e o modo FORMULA devolve o valor nas células sem fórmula. Normaliza e reaproveita fromGrid.
+  function fromApi(values, formulas) {
+    values = values || []; formulas = formulas || [];
+    const rows = Math.max(values.length, formulas.length);
+    let cols = 20;
+    for (const r of values) cols = Math.max(cols, r.length);
+    for (const r of formulas) cols = Math.max(cols, r.length);
+    const pad = (grid, keep) => Array.from({ length: rows }, (_, i) => Array.from({ length: cols }, (_, j) => {
+      const v = (grid[i] || [])[j];
+      return v == null ? "" : keep(v);
+    }));
+    return fromGrid(pad(values, v => v), pad(formulas, v => (typeof v === "string" && v.charAt(0) === "=") ? v : ""));
+  }
+  root.TreinoParser = { parseSheet, parseRest, fromGrid, fromApi };
   if (typeof module !== "undefined") module.exports = root.TreinoParser;
 })(typeof window !== "undefined" ? window : globalThis);

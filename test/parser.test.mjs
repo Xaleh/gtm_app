@@ -64,6 +64,23 @@ test("toda linha da planilha tem animação e as variações são reconhecidas",
   assert.ok(PixelMoves.specFor({ name: "SUPINO TOP SET 2 paralimpico", kind: "top" }).para);
 });
 
+// A API do Google corta as células vazias do fim de cada linha e devolve valores no modo FORMULA.
+function asApi(tab) {
+  const trim = row => { const r = row.slice(); while (r.length && (r[r.length - 1] === "" || r[r.length - 1] == null)) r.pop(); return r; };
+  const values = tab.values.map(trim);
+  while (values.length && !values[values.length - 1].length) values.pop();
+  const formulas = tab.values.map((row, i) => trim(row.map((v, j) => tab.formulas[i][j] || v)));
+  while (formulas.length && !formulas[formulas.length - 1].length) formulas.pop();
+  return { values, formulas };
+}
+
+test("resposta da API do Google Sheets dá o mesmo resultado que a planilha", () => {
+  const tab = coachTab("2610 SEMANA 20");
+  const { values, formulas } = asApi(tab);
+  assert.ok(values.some(r => r.length < 20), "a simulação corta as linhas");
+  assert.deepEqual(P.parseSheet(P.fromApi(values, formulas), tab.name), parseTab(tab));
+});
+
 // Opcional: compara a leitura via SheetJS (.xlsx) com a leitura via Apps Script na sua planilha real.
 // XLSX_PATH=/caminho/planilha.xlsx npm test
 test("planilha real: SheetJS e Apps Script dão o mesmo resultado", { skip: !process.env.XLSX_PATH }, async () => {
@@ -72,8 +89,11 @@ test("planilha real: SheetJS e Apps Script dão o mesmo resultado", { skip: !pro
   const wb = XLSX.read(fs.readFileSync(process.env.XLSX_PATH), { cellFormula: true });
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name];
-    const a = P.parseSheet(ws, name), b = parseTab(gridFromSheetJS(XLSX, ws, name));
+    const grid = gridFromSheetJS(XLSX, ws, name);
+    const a = P.parseSheet(ws, name), b = parseTab(grid);
     assert.deepEqual(b, a, name);
+    const api = asApi(grid);
+    assert.deepEqual(P.parseSheet(P.fromApi(api.values, api.formulas), name), a, name + " (API)");
     for (const s of a.sessions) for (const e of s.exercises) assert.ok(PixelMoves.specFor(e), e.name);
   }
 });

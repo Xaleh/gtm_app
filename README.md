@@ -8,6 +8,8 @@ Player de treino de powerlifting alimentado pela planilha semanal do treinador n
 - Anima em pixel art todos os 25 movimentos que já apareceram na planilha, seguindo a variação (pausa, descida lenta, pausa no joelho, touch'n go, paralímpico).
 - No fim de cada exercício confirma a carga usada; se mudou num top set, oferece atualizar o PR.
 - Na última série de cada top set de agachamento, supino e terra, abre a câmera para filmar. O vídeo fica guardado no app até você salvar no app Fotos (folha de compartilhar → Salvar Vídeo), com o nome do arquivo indicando exercício, carga, séries e data. Daí você envia ao treinador quando quiser.
+- Lê a planilha do treinador de três jeitos: pelo link (o mais simples), pelo Apps Script (guarda PRs e histórico numa planilha sua) ou importando o .xlsx.
+- Exporta o histórico de cargas e PRs em .csv.
 - Avisa o fim do descanso no celular: com o app aberto, pelo próprio timer; com o iPhone bloqueado, por notificação do app ntfy.
 - Funciona offline na academia: os registros ficam no celular e sobem quando a conexão volta.
 
@@ -90,6 +92,29 @@ Em **Ajustes → Tela**, a opção **Manter a tela acesa no treino** vem ligada.
 Como funciona: ao concluir uma série, o app agenda duas mensagens no ntfy, uma a 10 s do fim do descanso e outra no fim, com a próxima carga e as anilhas por lado. Se você começa a série antes, ou volta, as mensagens são canceladas. Se o descanso ganha +30 s, elas são reagendadas. O ntfy aceita atraso mínimo de 10 s, então descansos de até 20 s não recebem o aviso de 10 s.
 
 O tópico funciona como senha: quem souber o nome consegue ler e mandar mensagens nele. Não compartilhe.
+
+## Planilha por link (sem Apps Script) — o jeito mais simples
+
+Para quem não quer mexer com Apps Script: o treinador compartilha a planilha como **Qualquer pessoa com o link → Leitor**, manda o link, e o atleta cola no app (primeira tela ou **Ajustes → Planilha do treinador**). O app lê a planilha pela API do Google Sheets toda vez que abre e troca de semana quando aparece uma aba nova na frente. Durante um treino a semana não muda; a troca entra quando o treino termina.
+
+Quem tiver o link consegue ver a planilha. O link é longo e não dá para adivinhar, mas não deve circular em grupos.
+
+Histórico, PRs e vídeos ficam no celular. Em **Ajustes → Seu histórico** (ou em "Exportar", na tela inicial) o atleta exporta tudo num .csv que abre no Planilhas Google e no Excel.
+
+### Criar a chave da API (uma vez, por quem mantém o app)
+
+1. Em [console.cloud.google.com](https://console.cloud.google.com), crie um projeto (ex.: `gtm-app`).
+2. Em **APIs e serviços → Biblioteca**, ative a **Google Sheets API**.
+3. Em **APIs e serviços → Credenciais → Criar credenciais → Chave de API**.
+4. Edite a chave e restrinja:
+   - **Restrições de aplicativo → Sites**: `https://xaleh.github.io/*`
+   - **Restrições de API → Restringir chave**: só **Google Sheets API**
+5. No GitHub: **Settings → Secrets and variables → Actions → Variables → New repository variable**, nome `SHEETS_API_KEY`, valor = a chave.
+6. Em **Actions → Publicar no GitHub Pages → Run workflow**, para publicar com a chave.
+
+A chave fica visível no código do site, como em qualquer app web que usa APIs do Google; as restrições acima impedem o uso fora do GTM e fora da API de planilhas. Ela não dá acesso a nada privado: só lê planilhas abertas por link. Sem a variável, o app esconde a opção de link e segue com .xlsx e Apps Script.
+
+A cota gratuita da API (300 leituras por minuto por projeto) atende com folga: cada abertura do app faz 3 leituras.
 
 ## Usar só com o .xlsx (sem Apps Script)
 

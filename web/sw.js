@@ -2,7 +2,7 @@
 // Arquivos do próprio app: rede primeiro (pega a versão nova na hora), cache só quando estiver offline.
 // Fontes: cache primeiro (não mudam). API do Apps Script e ntfy: não passam por aqui.
 const VERSION = "gtm-v1";
-const SHELL = ["./", "index.html", "styles.css", "app.js", "parser.js", "pixel.js", "sample-week.js", "manifest.webmanifest",
+const SHELL = ["./", "index.html", "styles.css", "app.js", "parser.js", "pixel.js", "sample-week.js", "config.js", "manifest.webmanifest",
   "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

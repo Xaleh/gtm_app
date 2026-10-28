@@ -25,6 +25,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Versão do cache do app
         run: sed -i "s/gtm-v1/gtm-${GITHUB_SHA::8}/" web/sw.js
+      - name: Chave da API do Google Sheets
+        if: ${{ vars.SHEETS_API_KEY != '' }}
+        env:
+          KEY: ${{ vars.SHEETS_API_KEY }}
+        run: |
+          if ! printf '%s' "$KEY" | grep -Eq '^[A-Za-z0-9_-]+$'; then echo "SHEETS_API_KEY com caracteres inválidos"; exit 1; fi
+          sed -i "s/sheetsApiKey: \"\"/sheetsApiKey: \"$KEY\"/" web/config.js
+          grep -q "$KEY" web/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
