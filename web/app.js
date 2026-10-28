@@ -366,8 +366,8 @@ function savePR(l){
 }
 function setSetting(k, v){ S.settings[k] = v; save("settings", S.settings); render(); }
 function togglePlate(kg){ const a = S.settings.plates; S.settings.plates = a.includes(kg) ? a.filter(x=>x!==kg) : [...a, kg]; save("settings", S.settings); render(); }
-function goHome(){ S.view = "home"; render(); window.scrollTo(0, 0); }
-function closeRun(){ cancelRestPush(); S.run = null; save("run", null); S.view = "home"; render(); }
+function goHome(){ if (window.__gtmUpdate) { location.reload(); return; } S.view = "home"; render(); window.scrollTo(0, 0); }
+function closeRun(){ cancelRestPush(); S.run = null; save("run", null); if (window.__gtmUpdate) { location.reload(); return; } S.view = "home"; render(); }
 
 let toastT;
 function toast(msg){ let t = document.querySelector(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role","status"); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
@@ -629,7 +629,18 @@ function pendingVideos(){
 }
 
 /* ---------- Início ---------- */
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js", {updateViaCache: "none"}).then(reg => reg.update()).catch(() => {});
+  // versão nova instalada: recarrega uma vez para aplicar, se não estiver no meio de uma série
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    if (S.view === "play" && S.run && S.run.phase !== "done") { window.__gtmUpdate = true; toast("Versão nova do app pronta. Ela entra quando você voltar à tela inicial."); return; }
+    location.reload();
+  });
+}
 render();
 if (connected()) flush();
 loadVideos();
