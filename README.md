@@ -7,7 +7,7 @@ Player de treino de powerlifting alimentado pela planilha semanal do treinador n
 - Mostra as anilhas por lado, o timer de descanso com alerta e a carga da próxima série para montar a barra.
 - Anima em pixel art todos os 25 movimentos que já apareceram na planilha, seguindo a variação (pausa, descida lenta, pausa no joelho, touch'n go, paralímpico).
 - No fim de cada exercício confirma a carga usada; se mudou num top set, oferece atualizar o PR.
-- Avisa o fim do descanso no iPhone e no Apple Watch pelo app ntfy.
+- Avisa o fim do descanso no celular: com o app aberto, pelo próprio timer; com o iPhone bloqueado, por notificação do app ntfy.
 - Funciona offline na academia: os registros ficam no celular e sobem quando a conexão volta.
 
 ## Como as peças se encaixam
@@ -16,7 +16,7 @@ Player de treino de powerlifting alimentado pela planilha semanal do treinador n
 Planilha do treinador ──(leitura, todo dia 6h)──▶ Apps Script (no seu Drive) ──▶ Planilha "GTM — Dados"
                                                      ▲   │                         (PRs, histórico, cargas)
                                          token       │   ▼ JSON
-                                                   PWA no GitHub Pages ──▶ ntfy.sh ──▶ iPhone ──▶ Apple Watch
+                                                   PWA no GitHub Pages ──▶ ntfy.sh ──▶ iPhone
 ```
 
 | Pasta | O que tem |
@@ -75,18 +75,16 @@ Ao atualizar o código do script depois, use **Implantar → Gerenciar implanta�
 2. Toque em **Compartilhar → Adicionar à Tela de Início**.
 3. Abra o app pela tela de início, vá em **Ajustes**, cole o endereço `/exec` e o token, e toque em **Salvar e conectar**.
 
-### 5. Avisos no Apple Watch
+### 5. Avisos com o iPhone bloqueado
 
-O Safari não deixa um site mandar notificação agendada sozinho, então o app usa o [ntfy](https://ntfy.sh), um serviço gratuito de notificações.
+Com o app aberto, o timer apita no fim do descanso. Para ser avisado com o iPhone bloqueado ou em outro app, o GTM usa o [ntfy](https://ntfy.sh), um serviço gratuito de notificações, porque o Safari não deixa um site agendar notificações sozinho.
 
 1. Instale o app **ntfy** no iPhone.
 2. No GTM, em **Ajustes**, ligue **Avisar fim do descanso**. O app cria um tópico aleatório.
 3. No ntfy, toque em **+** e assine esse tópico.
-4. Toque em **Testar no relógio (15 s)** e bloqueie o iPhone. O aviso chega 15 s depois e vibra no relógio.
+4. Toque em **Enviar teste** para conferir.
 
-O iPhone só repassa notificações ao Watch quando ele próprio está bloqueado, com a tela apagada, e o relógio está no pulso e desbloqueado. Um modo Foco ativo também segura o aviso. Com o iPhone na mão e desbloqueado, a notificação fica só nele.
-
-Por isso, ao ligar os avisos, o app desliga a opção **Manter a tela acesa no treino**: o iPhone bloqueia sozinho durante o descanso e o aviso vai para o relógio. Um bloqueio automático curto (Ajustes do iPhone → Tela e Brilho → Bloqueio Automático → 30 segundos) faz isso acontecer bem antes do fim do descanso. No app Watch do iPhone, confira em **Notificações → ntfy** se **Espelhar alertas do iPhone** está ligado.
+Em **Ajustes → Tela**, a opção **Manter a tela acesa no treino** vem ligada. Desligue para economizar bateria; com a tela apagada, o aviso chega pelo ntfy.
 
 Como funciona: ao concluir uma série, o app agenda duas mensagens no ntfy, uma a 10 s do fim do descanso e outra no fim, com a próxima carga e as anilhas por lado. Se você começa a série antes, ou volta, as mensagens são canceladas. Se o descanso ganha +30 s, elas são reagendadas. O ntfy aceita atraso mínimo de 10 s, então descansos de até 20 s não recebem o aviso de 10 s.
 
